@@ -51,8 +51,6 @@ function _updateThemeIcons() {
   const asset = isLight ? 'asset/logo-w.svg' : 'asset/logo-b.svg';
   const navImg = document.querySelector('.nav-brand img');
   if (navImg) navImg.src = asset;
-  const favicon = document.querySelector('link[rel="icon"]');
-  if (favicon) favicon.href = asset;
 }
 
 function _nextTheme(current) {
