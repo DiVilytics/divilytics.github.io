@@ -28,7 +28,7 @@ async function init() {
       pfNick = loggedProfile.nickname;
       history.replaceState(null, '', `player.html?nick=${encodeURIComponent(pfNick)}`);
     } else if (loggedUser && !loggedProfile) {
-      document.title = 'DVS — Player';
+      document.title = 'DiVilytics — Player';
       document.getElementById('pfRoot').className = '';
       document.getElementById('pfRoot').innerHTML = `
         <div class="empty">
@@ -46,7 +46,7 @@ async function init() {
     }
   }
 
-  document.title = `DVS — ${pfNick}`;
+  document.title = `DiVilytics — ${pfNick}`;
 
   const [chars, { data: viewedProfile }] = await Promise.all([
     loadCharacters(),

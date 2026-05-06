@@ -51,7 +51,7 @@ function _updateMediaMetadata() {
   navigator.mediaSession.metadata = new MediaMetadata({
     title:  `Turn ${liveTurns}`,
     artist: 'Update Timer and Turns',
-    album:  location ? `DVS | Playing at ${location}` : 'DVS | New Game',
+    album:  location ? `DiVilytics | Playing at ${location}` : 'DiVilytics | New Game',
     artwork: [
       { src: icon, sizes: '96x96',  type: 'image/png' },
       { src: icon, sizes: '512x512', type: 'image/png' },

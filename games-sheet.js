@@ -18,7 +18,7 @@ let liveTurns       = 0;
 let liveTimerId     = null;
 let _saveIntervalId = null;
 
-const _LIVE_KEY = 'dvs_live_game';
+const _LIVE_KEY = 'divilytics_live_game';
 
 // ── SHEET (NEW / EDIT) ────────────────────────────────────────────────────────
 
