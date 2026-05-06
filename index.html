@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <title>DVS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="asset/logo-b.svg" type="image/svg+xml">
+</head>
+<body>
+
+<nav>
+  <a class="nav-brand" href="index.html"><img src="asset/logo-b.svg" alt="Disney Villainous Stats"></a>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="games.html" title="Games">🕒</a>
+      <a href="leaderboard.html" title="Leaderboard">🏆</a>
+      <a href="character.html" title="Characters">🎭</a>
+      <a href="player.html" id="navProfile" title="Player">👤</a>
+      <a href="draw.html" title="Draw">🎲</a>
+    </div>
+    <div class="nav-auth" id="navAuth"></div>
+  </div>
+</nav>
+
+<main>
+  <div class="home-hero">
+    <h1 class="home-title">DVS | Disney Villainous Stats</h1>
+    <p class="home-tagline">Archive, track, and analyze your Disney Villainous sessions.<br>Contribute to a shared community database and consult global stats.</p>
+  </div>
+
+  <div class="home-steps">
+    <div class="home-step">
+      <span class="home-step-num">1</span>
+      <div class="home-step-body">
+        <strong>Getting Started</strong>
+        <span>Sign in with Discord and choose a unique nickname. DVS generates a QR code tied to your profile; your digital signature storing all your game history and performance metrics.</span>
+      </div>
+    </div>
+    <div class="home-step">
+      <span class="home-step-num">2</span>
+      <div class="home-step-body">
+        <strong>Match Configuration</strong>
+        <span>Pick characters manually or let DVS assign villains randomly. Use the built-in randomizer to determine the starting player and turn order.</span>
+      </div>
+    </div>
+    <div class="home-step">
+      <span class="home-step-num">3</span>
+      <div class="home-step-body">
+        <strong>Live Session</strong>
+        <span>Tap Start Game to begin. An automated timer records the exact duration; tap + at each turn to keep the count precise. It works on screen locked as well!</span>
+      </div>
+    </div>
+    <div class="home-step">
+      <span class="home-step-num">4</span>
+      <div class="home-step-body">
+        <strong>Save &amp; Sync</strong>
+        <span>Declare the winning villain and save to the global archive. A session QR code lets opponents instantly link their profiles to the characters they played; stats updated for everyone.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="home-sections">
+    <a class="home-section-link" href="games.html">
+      <span class="home-section-icon">🕒</span>
+      <div class="home-section-text">
+        <span class="home-section-name">Games</span>
+        <span class="home-section-desc">Log new games with turns and duration, browse game history</span>
+      </div>
+    </a>
+    <a class="home-section-link" href="leaderboard.html">
+      <span class="home-section-icon">🏆</span>
+      <div class="home-section-text">
+        <span class="home-section-name">Leaderboard</span>
+        <span class="home-section-desc">Rankings, win rates, and stats across players and characters</span>
+      </div>
+    </a>
+    <a class="home-section-link" href="character.html">
+      <span class="home-section-icon">🎭</span>
+      <div class="home-section-text">
+        <span class="home-section-name">Characters</span>
+        <span class="home-section-desc">Win rates and stats for each villain</span>
+      </div>
+    </a>
+    <a class="home-section-link" href="player.html">
+      <span class="home-section-icon">👤</span>
+      <div class="home-section-text">
+        <span class="home-section-name">Player</span>
+        <span class="home-section-desc">Profile, game history, and stats for you or any player</span>
+      </div>
+    </a>
+    <a class="home-section-link" href="draw.html">
+      <span class="home-section-icon">🎲</span>
+      <div class="home-section-text">
+        <span class="home-section-name">Draw</span>
+        <span class="home-section-desc">Utility to randomly pick a villain or randomize play order</span>
+      </div>
+    </a>
+    <div class="home-section-link home-section-static" id="homeThemeRow">
+      <span class="home-section-icon" id="homeThemeIcon">☀️</span>
+      <div class="home-section-text">
+        <span class="home-section-name">Theme</span>
+        <span class="home-section-desc">Set the app to dark, light, or system theme</span>
+      </div>
+      <div class="home-section-btns">
+        <button class="btn btn-ghost btn-sm" onclick="setTheme('dark')"  title="Force dark">🌙 Dark</button>
+        <button class="btn btn-ghost btn-sm" onclick="setTheme('light')" title="Force light">☀️ Light</button>
+        <button class="btn btn-ghost btn-sm" onclick="setTheme('auto')"  title="Follow system">🌗 Auto</button>
+      </div>
+    </div>
+    <div class="home-section-link home-section-static" id="homeAuthRow">
+      <span class="home-section-icon">⎆</span>
+      <div class="home-section-text">
+        <span class="home-section-name">Account</span>
+        <span class="home-section-desc">Sign in with Discord to log games and appear on leaderboards</span>
+      </div>
+      <div class="home-section-btns">
+        <button class="btn btn-ghost btn-sm" onclick="signInWithDiscord()">⎆ Sign in</button>
+        <button class="btn btn-ghost btn-sm" onclick="signOut()">⏻ Sign out</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="db.js"></script>
+  <script src="ui.js"></script>
+  <script src="shared.js"></script>
+<script src="index.js"></script>
+</body>
+</html>

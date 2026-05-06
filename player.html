@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <title>DVS | Player</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="asset/logo-b.svg" type="image/svg+xml">
+</head>
+<body>
+
+<nav>
+  <a class="nav-brand" href="index.html"><img src="asset/logo-b.svg" alt="Disney Villainous Stats"></a>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="games.html" title="Games">🕒</a>
+      <a href="leaderboard.html" title="Leaderboard">🏆</a>
+      <a href="character.html" title="Characters">🎭</a>
+      <a href="player.html" id="navProfile" title="Player">👤</a>
+      <a href="draw.html" title="Draw">🎲</a>
+    </div>
+    <div class="nav-auth" id="navAuth"></div>
+  </div>
+</nav>
+
+<main>
+  <div class="page-header" style="align-items:flex-start">
+    <div>
+      <h2>Player</h2>
+    </div>
+    <div class="cs-search">
+      <input type="text" id="pfJumpInput" placeholder="Search player…" maxlength="30" autocomplete="off"
+        oninput="pfSearchInput(event)" onkeydown="pfSearchKeydown(event)" onblur="pfSearchBlur()">
+      <div class="cs-dropdown" id="pfDropdown"></div>
+    </div>
+  </div>
+
+  <div id="pfIdentity"></div>
+
+  <div class="controls" id="pfControls" style="display:none">
+    <div class="pill-group" id="pfFilterPills">
+      <button class="pill on" onclick="pfSetFilter('all')" type="button">All</button>
+      <button class="pill"    onclick="pfSetFilter(2)"     type="button">2p</button>
+      <button class="pill"    onclick="pfSetFilter(3)"     type="button">3p</button>
+      <button class="pill"    onclick="pfSetFilter(4)"     type="button">4p</button>
+      <button class="pill"    onclick="pfSetFilter(5)"     type="button">5p</button>
+      <button class="pill"    onclick="pfSetFilter(6)"     type="button">6p</button>
+    </div>
+  </div>
+
+  <div id="pfRoot" class="spinner">Loading…</div>
+</main>
+
+<!-- QR Code sheet (shared for profile + individual games) -->
+<div class="overlay" id="qrOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <h3 id="qrTitle">Share your profile</h3>
+      <button class="sheet-close" onclick="closeProfileQR()">×</button>
+    </div>
+    <div class="sheet-body">
+      <p id="qrBlurb" style="font-size:13px;color:var(--muted);margin-bottom:16px">Others can scan this to view your player profile.</p>
+      <div class="qr-wrap">
+        <div id="qrCode"></div>
+      </div>
+      <div class="qr-url-row">
+        <div class="qr-url" id="qrUrlText"></div>
+        <button class="pf-btn" onclick="copyQrUrl()" title="Copy link">⎘</button>
+      </div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn btn-primary" onclick="closeProfileQR()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit game sheet -->
+<div class="overlay" id="pfEditOverlay" onclick="if(event.target===this) pfCloseEdit()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <h3>Edit Game</h3>
+      <button class="sheet-close" onclick="pfCloseEdit()">×</button>
+    </div>
+    <div class="sheet-body">
+      <div class="err" id="pfEditErr"></div>
+      <p class="edit-hint">
+        You can only fill in missing info (duration, turn count, location). Once set, a field can't be changed; delete the game to redo it.
+      </p>
+      <div class="form-row-3">
+        <div class="field">
+          <label>Duration <span class="optional">(min)</span></label>
+          <input type="number" id="pfEditDur" min="1" max="999" placeholder="optional">
+        </div>
+        <div class="field">
+          <label>Turns <span class="optional"></span></label>
+          <input type="number" id="pfEditTurns" min="1" max="999" placeholder="optional">
+        </div>
+        <div class="field">
+          <label>Location <span class="optional"></span></label>
+          <input type="text" id="pfEditLocation" maxlength="60" placeholder="optional">
+        </div>
+      </div>
+    </div>
+    <div class="sheet-footer sheet-footer-row">
+      <button class="btn btn-ghost"   onclick="pfCloseEdit()">Cancel</button>
+      <button class="btn btn-primary" id="pfEditSaveBtn" onclick="pfSaveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete game confirmation -->
+<div class="overlay" id="pfDeleteGameOverlay" onclick="if(event.target===this) pfCancelDeleteGame()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <h3>Delete Game?</h3>
+      <button class="sheet-close" onclick="pfCancelDeleteGame()">×</button>
+    </div>
+    <div class="sheet-body">
+      <p class="confirm-text">This will permanently delete the game and all player records. This action cannot be undone.</p>
+    </div>
+    <div class="sheet-footer sheet-footer-row">
+      <button class="btn btn-ghost" onclick="pfCancelDeleteGame()">Cancel</button>
+      <button class="btn btn-danger" onclick="pfConfirmDeleteGame()">Delete Game</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="db.js"></script>
+  <script src="ui.js"></script>
+  <script src="shared.js"></script>
+<script src="player.js"></script>
+</body>
+</html>

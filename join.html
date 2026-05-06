@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <title>DVS | Claim Character</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="asset/logo-b.svg" type="image/svg+xml">
+</head>
+<body>
+
+<nav>
+  <a class="nav-brand" href="index.html"><img src="asset/logo-b.svg" alt="Disney Villainous Stats"></a>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="games.html" title="Games">🕒</a>
+      <a href="leaderboard.html" title="Leaderboard">🏆</a>
+      <a href="character.html" title="Characters">🎭</a>
+      <a href="player.html" id="navProfile" title="Player">👤</a>
+      <a href="draw.html" title="Draw">🎲</a>
+    </div>
+    <div class="nav-auth" id="navAuth"></div>
+  </div>
+</nav>
+
+<main>
+  <div class="page-header">
+    <h2>Claim your character</h2>
+  </div>
+  <div id="claimRoot" class="spinner">Loading…</div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="db.js"></script>
+  <script src="ui.js"></script>
+  <script src="shared.js"></script>
+<script src="join.js"></script>
+</body>
+</html>
