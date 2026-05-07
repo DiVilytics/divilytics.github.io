@@ -1331,7 +1331,6 @@ hr.draw-divider {
 
 @media (max-width: 480px) {
   .form-row-3 { grid-template-columns: 1fr 1fr; }
-  .summary { grid-template-columns: 1fr 1fr; }
   .lb-head, .lb-row { grid-template-columns: 24px 1fr 52px 52px 44px; }
   .cs-table .lb-head, .cs-table .lb-row { grid-template-columns: 68px 1fr 56px 44px; }
   .player-form-row select { flex: 1.3; }

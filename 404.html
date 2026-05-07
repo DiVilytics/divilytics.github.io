@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-  <title>DiVilytics | Characters</title>
+  <base href="/">
+  <title>DiVilytics | Page Not Found</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="/style.css">
   <link rel="icon" type="image/png" href="/favicon-96x96.png?v=20260506" sizes="96x96" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20260506" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260506" />
@@ -25,41 +26,33 @@
 <body>
 
 <nav>
-  <a class="nav-brand" href="index.html"><img src="asset/logo-b.svg" alt="DiVilytics | Disney Villainous Analytics"></a>
+  <a class="nav-brand" href="/index.html"><img src="/asset/logo-b.svg" alt="DiVilytics | Disney Villainous Analytics"></a>
   <div class="nav-right">
     <div class="nav-links">
-      <a href="games.html" title="Games">🕒</a>
-      <a href="leaderboard.html" title="Leaderboard">🏆</a>
-      <a href="characters.html" title="Characters">🎭</a>
-      <a href="player.html" id="navProfile" title="Player">👤</a>
-      <a href="draw.html" title="Draw">🎲</a>
+      <a href="/games.html" title="Games">🕒</a>
+      <a href="/leaderboard.html" title="Leaderboard">🏆</a>
+      <a href="/characters.html" title="Characters">🎭</a>
+      <a href="/player.html" id="navProfile" title="Player">👤</a>
+      <a href="/draw.html" title="Draw">🎲</a>
     </div>
     <div class="nav-auth" id="navAuth"></div>
   </div>
 </nav>
 
 <main>
-  <div class="page-header" style="align-items:flex-start">
-    <div>
-      <h2>Characters</h2>
-    </div>
-    <div class="cs-search" id="csSearchWrap" style="display:none">
-      <input type="text" id="csSearchInput" placeholder="Jump to character…" autocomplete="off"
-        oninput="csSearchInput(event)" onkeydown="csSearchKeydown(event)" onblur="csSearchBlur()">
-      <div class="cs-dropdown" id="csDropdown"></div>
-    </div>
+  <div class="home-hero">
+    <h1 class="home-title">404 | Page Not Found</h1>
+    <p class="home-tagline">The page you're looking for doesn't exist or has been moved.<br>Maybe one of the villains stole it.</p>
+    <p style="margin-top:18px">
+      <a href="/index.html" class="btn btn-primary">← Back to home</a>
+    </p>
   </div>
-
-  <div id="csIdentity"></div>
-
-  <div id="csRoot" class="spinner">Loading…</div>
-  <div id="csFaq"></div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="db.js"></script>
-  <script src="ui.js"></script>
-  <script src="shared.js"></script>
-<script src="characters.js"></script>
+<script src="/db.js"></script>
+<script src="/ui.js"></script>
+<script src="/shared.js"></script>
+<script>initAuth();</script>
 </body>
 </html>
