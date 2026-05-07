@@ -148,7 +148,7 @@ function render({ rows, summary }) {
         const dispSub = mode === 'games' ? r.wins : r.games;
         const sub     = isChar ? (charBoxMap[key] || '') : '';
         const href    = isChar
-          ? `character.html?char=${encodeURIComponent(key)}`
+          ? `characters.html?char=${encodeURIComponent(key)}`
           : `player.html?nick=${encodeURIComponent(key)}`;
         return `
           <a class="lb-row link" href="${href}">

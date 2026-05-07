@@ -37,14 +37,14 @@ let allChars  = [];        // full character list for search
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
 async function init() {
-  setActiveNav('character.html');
+  setActiveNav('characters.html');
   await initAuth();
 
   const params   = new URLSearchParams(location.search);
   const charName = (params.get('char') || '').trim();
 
   if (!charName) {
-    document.title = 'DiVilytics — Characters';
+    document.title = 'DiVilytics | Characters';
 
     allChars = await loadCharacters();
     document.getElementById('csSearchWrap').style.display = '';
@@ -57,7 +57,7 @@ async function init() {
         <div class="char-roster-group-name">${_esc(box)}</div>
         <div class="char-roster">${
           chars.map(c => `
-            <a class="char-roster-item" href="character.html?char=${encodeURIComponent(c.name)}">
+            <a class="char-roster-item" href="characters.html?char=${encodeURIComponent(c.name)}">
               <img class="char-roster-portrait" src="${charImgSrc(c.name)}" alt="" onerror="this.src='asset/player.svg'">
               <div class="char-roster-name">${_esc(c.name)}</div>
             </a>`).join('')
@@ -66,7 +66,7 @@ async function init() {
     return;
   }
 
-  document.title = `DiVilytics — ${charName}`;
+  document.title = `DiVilytics | ${charName}`;
 
   allChars = await loadCharacters();
   csChar   = allChars.find(c => c.name === charName);
@@ -156,7 +156,7 @@ function csSearchInput(e) {
         <span>${_esc(c.name)}</span>
         <span class="cs-option-box">${_esc(c.box)}</span>
       </div>`).join(''),
-    opt => { location.href = `character.html?char=${encodeURIComponent(opt.dataset.name)}`; }
+    opt => { location.href = `characters.html?char=${encodeURIComponent(opt.dataset.name)}`; }
   );
 }
 
@@ -169,7 +169,7 @@ function csSearchKeydown(e) {
     e,
     document.getElementById('csDropdown'),
     document.getElementById('csSearchInput'),
-    opt => { location.href = `character.html?char=${encodeURIComponent(opt.dataset.name)}`; }
+    opt => { location.href = `characters.html?char=${encodeURIComponent(opt.dataset.name)}`; }
   );
 }
 

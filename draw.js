@@ -69,7 +69,7 @@ function roll() {
   const nameEl      = document.getElementById('resultName');
 
   if (!pool.length) {
-    placeholder.textContent = 'No characters available — clear some exclusions.';
+    placeholder.textContent = 'No characters available. Clear some exclusions.';
     placeholder.style.display = '';
     nameEl.style.display = 'none';
     return;

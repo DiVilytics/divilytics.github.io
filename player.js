@@ -28,7 +28,7 @@ async function init() {
       pfNick = loggedProfile.nickname;
       history.replaceState(null, '', `player.html?nick=${encodeURIComponent(pfNick)}`);
     } else if (loggedUser && !loggedProfile) {
-      document.title = 'DiVilytics — Player';
+      document.title = 'DiVilytics | Player';
       document.getElementById('pfRoot').className = '';
       document.getElementById('pfRoot').innerHTML = `
         <div class="empty">
@@ -46,7 +46,7 @@ async function init() {
     }
   }
 
-  document.title = `DiVilytics — ${pfNick}`;
+  document.title = `DiVilytics | ${pfNick}`;
 
   const [chars, { data: viewedProfile }] = await Promise.all([
     loadCharacters(),
@@ -286,7 +286,7 @@ function render() {
         const dispSub = pfMode === 'games' ? r.wins : r.games;
         const sub     = charBoxMap[r.key] || '';
         return `
-          <a class="lb-row link" href="character.html?char=${encodeURIComponent(r.key)}">
+          <a class="lb-row link" href="characters.html?char=${encodeURIComponent(r.key)}">
             <div class="rank-num ${medalClass(rank)}">${rank}</div>
             <div class="row-identity">
               ${charImgHTML(r.key)}

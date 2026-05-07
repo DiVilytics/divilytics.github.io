@@ -188,7 +188,7 @@ async function _saveNickname() {
     const { error } = await db.from('profiles').update({ nickname: nick }).eq('id', _currentUser.id);
     if (error) {
       errEl.textContent = error.message.includes('unique') || error.message.includes('duplicate')
-        ? 'That nickname is already taken — try another.'
+        ? 'That nickname is already taken. Try another.'
         : error.message;
       errEl.classList.add('show');
       return;
@@ -208,7 +208,7 @@ async function _saveNickname() {
 
   if (error) {
     errEl.textContent = error.message.includes('unique') || error.message.includes('duplicate')
-      ? 'That nickname is already taken — try another.'
+      ? 'That nickname is already taken. Try another.'
       : error.message;
     errEl.classList.add('show');
     return;

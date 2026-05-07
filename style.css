@@ -1433,7 +1433,8 @@ hr.draw-divider {
   flex-shrink: 0;
 }
 .home-section-btns .btn {
-  min-width: 82px;
+  min-width: 34px;
+  padding: 5px 8px;
   justify-content: center;
 }
 
