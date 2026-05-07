@@ -12,6 +12,9 @@ let pfFilter         = 'all';   // 'all' | 2..6
 let pfWinsOnly       = false;
 let pfLocationFilter = null;
 
+const PF_PAGE_SIZE   = 20;
+let pfDisplayLimit   = PF_PAGE_SIZE;
+
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
 async function init() {
@@ -123,6 +126,7 @@ function pfToggleWinsOnly() {
   pfWinsOnly = !pfWinsOnly;
   const btn = document.getElementById('pfWinsOnlyBtn');
   if (btn) btn.classList.toggle('on', pfWinsOnly);
+  pfDisplayLimit = PF_PAGE_SIZE;
   _renderGamesList();
 }
 
@@ -204,6 +208,7 @@ function pfClearLocationFilter() {
 // ── RENDER ────────────────────────────────────────────────────────────────────
 
 function render() {
+  pfDisplayLimit = PF_PAGE_SIZE;
   const root = document.getElementById('pfRoot');
 
   if (!pfGames.length) {
@@ -327,13 +332,28 @@ function _renderGamesList(keepIds = pfFilteredGameIds()) {
     games = games.filter(g => winGameIds.has(g.id));
   }
 
+  const visible = games.slice(0, pfDisplayLimit);
+  const hasMore = games.length > visible.length;
+
   const list = document.getElementById('pfGamesList');
   if (!list) return;
   list.innerHTML = '';
-  for (const g of games) {
+  for (const g of visible) {
     const gp = pfPlayers.filter(p => p.game_id === g.id).sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || (a.id < b.id ? -1 : 1));
     list.appendChild(buildProfileCard(g, gp));
   }
+  if (hasMore) {
+    const btn = document.createElement('button');
+    btn.className = 'btn-load-more';
+    btn.textContent = 'Load more';
+    btn.onclick = () => { btn.disabled = true; pfLoadMore(); };
+    list.appendChild(btn);
+  }
+}
+
+function pfLoadMore() {
+  pfDisplayLimit += PF_PAGE_SIZE;
+  _renderGamesList();
 }
 function pfCanEditGame(g, gp) {
   const user = getCurrentUser();

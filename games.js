@@ -12,6 +12,7 @@ let _gameOffset     = 0;
 let _totalGames     = 0;
 let _hasMore        = false;
 let _filterDebounce = null;
+const PAGE_SIZE     = 20;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
@@ -41,18 +42,20 @@ async function load(reset = true) {
 
   const charArr  = filterChars.size > 0 ? [...filterChars] : null;
   const countVal = filterCount !== 'all' ? filterCount : null;
-  const pageSize = filterLocation ? 9999 : 20;
+  const locVal   = filterLocation || null;
 
   const [{ data: newGames, error }, { data: total }] = await Promise.all([
     db.rpc('get_game_page', {
-      char_filter:  charArr,
-      count_filter: countVal,
-      page_offset:  _gameOffset,
-      page_size:    pageSize,
+      char_filter:     charArr,
+      count_filter:    countVal,
+      location_filter: locVal,
+      page_offset:     _gameOffset,
+      page_size:       PAGE_SIZE,
     }),
     db.rpc('get_game_count', {
-      char_filter:  charArr,
-      count_filter: countVal,
+      char_filter:     charArr,
+      count_filter:    countVal,
+      location_filter: locVal,
     }),
   ]);
 
@@ -62,9 +65,8 @@ async function load(reset = true) {
     return;
   }
 
-  let g = newGames || [];
-  if (filterLocation) g = g.filter(game => game.location === filterLocation);
-  _totalGames = filterLocation ? g.length : (Number(total) || 0);
+  const g = newGames || [];
+  _totalGames = Number(total) || 0;
 
   let newPlayers = [];
   if (g.length) {
@@ -90,7 +92,7 @@ async function load(reset = true) {
     _gameOffset += g.length;
   }
 
-  _hasMore = !filterLocation && games.length < _totalGames;
+  _hasMore = games.length < _totalGames;
 
   document.getElementById('root').className = '';
   render();
