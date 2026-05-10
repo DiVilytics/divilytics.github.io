@@ -28,11 +28,11 @@
   <a class="nav-brand" href="index.html"><img src="asset/logo-b.svg" alt="DiVilytics | Disney Villainous Analytics"></a>
   <div class="nav-right">
     <div class="nav-links">
-      <a href="games.html" title="Games">🕒</a>
+      <a href="new-game.html" title="New Game">🎲</a>
+      <a href="game-log.html" title="Game Log">🕒</a>
       <a href="leaderboard.html" title="Leaderboard">🏆</a>
       <a href="characters.html" title="Characters">🎭</a>
       <a href="player.html" id="navProfile" title="Player">👤</a>
-      <a href="draw.html" title="Draw">🎲</a>
     </div>
     <div class="nav-auth" id="navAuth"></div>
   </div>
@@ -55,10 +55,10 @@
       <button class="sheet-close" onclick="closeDeleteAccount()">×</button>
     </div>
     <div class="sheet-body">
-      <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.5">
+      <p class="modal-hint">
         This removes your profile and unlinks you from every game you played.
         Past games stay visible but your nickname is removed from them, and the nickname becomes available for someone else to claim.
-        <strong style="color:var(--text)">This cannot be undone.</strong>
+        <strong>This cannot be undone.</strong>
       </p>
       <div class="err" id="delAccountErr"></div>
       <div class="field">
@@ -82,7 +82,7 @@
       <button class="sheet-close" onclick="closeProfileQR()">×</button>
     </div>
     <div class="sheet-body">
-      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Others can scan this to view your player profile.</p>
+      <p class="modal-hint">Others can scan this to view your player profile.</p>
       <div class="qr-wrap">
         <div id="acctQrCode"></div>
       </div>
@@ -99,6 +99,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="config.js"></script>
 <script src="db.js"></script>
   <script src="ui.js"></script>
   <script src="shared.js"></script>

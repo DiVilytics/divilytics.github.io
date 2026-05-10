@@ -1,3 +1,85 @@
+// ── LIVE GAME STATE ───────────────────────────────────────────────────────────
+//
+// In-memory state + localStorage persistence for an in-progress recorded game.
+// new-game.js drives all the writes; shared.js's nav badge only reads.
+// DOM tickers (the 1s clock and the periodic save) live in new-game.js.
+const liveGame = (() => {
+  // KEY and MAX_AGE_MS come from config.js (loaded earlier).
+  const KEY        = LIVE_GAME_KEY;
+  const MAX_AGE_MS = LIVE_GAME_MAX_AGE_MS;
+
+  let _start      = null;        // ms since epoch when current run began (null = paused/never)
+  let _turns      = 0;
+  let _exactDurMs = null;        // captured at stopLive, used to seed next run
+  let _hasSession = false;       // true once a real game has been started
+
+  const _hooks = { start: [], stop: [], turnBump: [], close: [] };
+
+  return {
+    KEY,
+    MAX_AGE_MS,
+
+    // queries
+    get hasSession() { return _hasSession; },
+    get startedAt()  { return _start; },
+    get isRunning()  { return _start != null; },
+    get isPaused()   { return _hasSession && _start == null; },
+    get turns()      { return _turns; },
+    get elapsedMs()  { return _start != null ? Date.now() - _start : 0; },
+    get exactDurMs() { return _exactDurMs; },
+
+    // mutators (caller wires DOM)
+    markStarted(startTs) { _start = startTs; _hasSession = true; _exactDurMs = null; },
+    markStopped(durMs)   { _exactDurMs = durMs; _start = null; },
+    setTurns(n)          { _turns = n; },
+    bumpTurns(delta) {
+      _turns = Math.max(1, _turns + delta);
+      this.emit('turnBump');
+    },
+
+    // event hooks
+    on(name, fn) { _hooks[name]?.push(fn); },
+    emit(name)   { _hooks[name]?.forEach(fn => fn()); },
+
+    // persistence — `extras` carries the form/slot data that only new-game.js knows
+    persist(extras = {}) {
+      if (!_hasSession) return;
+      try {
+        localStorage.setItem(KEY, JSON.stringify({
+          saved:       Date.now(),
+          liveStart:   _start,
+          liveTurns:   _turns,
+          isLive:      _start != null,
+          fDurExactMs: _exactDurMs,
+          ...extras,
+        }));
+      } catch (_) {}
+    },
+    clear() {
+      _start      = null;
+      _turns      = 0;
+      _exactDurMs = null;
+      _hasSession = false;
+      localStorage.removeItem(KEY);
+    },
+    // Returns the saved snapshot, or null if absent / stale / invalid.
+    loadSaved() {
+      let s;
+      try { s = JSON.parse(localStorage.getItem(KEY)); } catch (_) { return null; }
+      if (!s || !s.slots || !s.slots.length) return null;
+      if (Date.now() - s.saved > MAX_AGE_MS)  return null;
+      if (!s.liveStart && !s.fDurExactMs)     return null;
+      return s;
+    },
+    restoreFrom(state) {
+      _hasSession = true;
+      _start      = state.liveStart   || null;
+      _turns      = state.liveTurns   || 0;
+      _exactDurMs = state.fDurExactMs || null;
+    },
+  };
+})();
+
 // ── NAV ───────────────────────────────────────────────────────────────────────
 
 let _activeNavFile = '';
@@ -7,7 +89,26 @@ function setActiveNav(filename) {
   document.querySelectorAll('.nav-links a').forEach(a => {
     a.classList.toggle('active', a.getAttribute('href') === filename);
   });
+  updateLiveGameNavBadge();
 }
+
+// Reads the saved live game from localStorage and tags the New Game nav link
+// with `.has-live-game` (red, pulsing) or `.has-paused-game` (gold) so users
+// see at a glance that a game is open. Safe to call repeatedly.
+function updateLiveGameNavBadge() {
+  const link = document.querySelector('.nav-links a[href="new-game.html"]');
+  if (!link) return;
+  link.classList.remove('has-live-game', 'has-paused-game');
+
+  const state = liveGame.loadSaved();
+  if (!state) return;
+  link.classList.add(state.liveStart ? 'has-live-game' : 'has-paused-game');
+}
+
+// Cross-tab sync: another tab may have started/stopped a game.
+window.addEventListener('storage', e => {
+  if (e.key === liveGame.KEY) updateLiveGameNavBadge();
+});
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 
@@ -57,13 +158,7 @@ async function initAuth(onChange) {
 
 async function _loadProfile() {
   if (!_currentUser) return null;
-  const { data, error } = await db
-    .from('profiles')
-    .select('*')
-    .eq('id', _currentUser.id)
-    .maybeSingle();
-  if (error) console.warn('loadProfile error:', error);
-  _currentProfile = data || null;
+  _currentProfile = await fetchProfile({ id: _currentUser.id });
   return _currentProfile;
 }
 
@@ -121,7 +216,7 @@ function _injectNicknameModal() {
           <h3 id="nickModalTitle">Choose your nickname</h3>
         </div>
         <div class="sheet-body">
-          <p id="nickModalHint" style="font-size:13px;color:var(--muted);margin-bottom:16px">
+          <p id="nickModalHint" class="modal-hint">
             This nickname identifies you on game records and the leaderboard. You can't change it later.
           </p>
           <div class="err" id="nickErr"></div>
@@ -145,7 +240,7 @@ function _openNicknameModal(onSuccess) {
   document.getElementById('nickModalTitle').textContent = 'Choose your nickname';
   document.getElementById('nickModalHint').textContent  = "This nickname identifies you on game records and the leaderboard. You can't change it later.";
   document.getElementById('nickInput').value = '';
-  document.getElementById('nickErr').classList.remove('show');
+  clearError('nickErr');
   openOverlay('nicknameOverlay');
   setTimeout(() => document.getElementById('nickInput')?.focus(), 120);
 }
@@ -157,7 +252,7 @@ function openChangeNicknameModal(onSuccess) {
   document.getElementById('nickModalTitle').textContent = 'Change your nickname';
   document.getElementById('nickModalHint').textContent  = 'Your nickname will be updated on all past and future game records.';
   document.getElementById('nickInput').value = _currentProfile?.nickname || '';
-  document.getElementById('nickErr').classList.remove('show');
+  clearError('nickErr');
   openOverlay('nicknameOverlay');
   setTimeout(() => document.getElementById('nickInput')?.focus(), 120);
 }
@@ -173,48 +268,34 @@ async function _saveNickname() {
   const errEl = document.getElementById('nickErr');
   const nick  = input?.value.trim() || '';
 
-  errEl.textContent = '';
-  errEl.classList.remove('show');
+  clearError(errEl);
 
   if (nick.length < 2) {
-    errEl.textContent = 'Nickname must be at least 2 characters.';
-    errEl.classList.add('show');
+    showError(errEl, 'Nickname must be at least 2 characters.');
     return;
   }
+
+  const friendlyDupMsg = err =>
+    err.message.includes('unique') || err.message.includes('duplicate')
+      ? 'That nickname is already taken. Try another.'
+      : err.message;
 
   if (_nickMode === 'update') {
     if (nick === _currentProfile?.nickname) { _closeNicknameModal(); return; }
 
     const { error } = await db.from('profiles').update({ nickname: nick }).eq('id', _currentUser.id);
-    if (error) {
-      errEl.textContent = error.message.includes('unique') || error.message.includes('duplicate')
-        ? 'That nickname is already taken. Try another.'
-        : error.message;
-      errEl.classList.add('show');
-      return;
-    }
+    if (error) { showError(errEl, friendlyDupMsg(error)); return; }
 
     await db.from('game_players').update({ nickname: nick }).eq('user_id', _currentUser.id);
 
     _currentProfile = { ..._currentProfile, nickname: nick };
-    _closeNicknameModal();
-    _updateAuthUI();
-    if (_authChangeHook) _authChangeHook(_currentUser, _currentProfile);
-    if (_nickOnSuccess) _nickOnSuccess(nick);
-    return;
+  } else {
+    const { error } = await db.from('profiles').insert({ id: _currentUser.id, nickname: nick });
+    if (error) { showError(errEl, friendlyDupMsg(error)); return; }
+
+    _currentProfile = { id: _currentUser.id, nickname: nick };
   }
 
-  const { error } = await db.from('profiles').insert({ id: _currentUser.id, nickname: nick });
-
-  if (error) {
-    errEl.textContent = error.message.includes('unique') || error.message.includes('duplicate')
-      ? 'That nickname is already taken. Try another.'
-      : error.message;
-    errEl.classList.add('show');
-    return;
-  }
-
-  _currentProfile = { id: _currentUser.id, nickname: nick };
   _closeNicknameModal();
   _updateAuthUI();
   if (_authChangeHook) _authChangeHook(_currentUser, _currentProfile);

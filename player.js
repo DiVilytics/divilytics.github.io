@@ -3,8 +3,7 @@
 let pfNick      = '';
 let pfGames     = [];   // games this nickname appeared in
 let pfPlayers   = [];   // all players for those games
-let charBoxMap  = {};
-let pfChars     = [];
+let pfCharBoxMap  = {};
 let pfAvatarUrl = null;
 
 let pfMode           = 'pct';   // 'pct' | 'count' | 'games'
@@ -12,14 +11,14 @@ let pfFilter         = 'all';   // 'all' | 2..6
 let pfWinsOnly       = false;
 let pfLocationFilter = null;
 
-const PF_PAGE_SIZE   = 20;
-let pfDisplayLimit   = PF_PAGE_SIZE;
+let pfDisplayLimit   = PAGE_SIZE;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
 async function init() {
   setActiveNav('player.html');
   await initAuth();
+  _attachPlayerSearch();
 
   const params = new URLSearchParams(location.search);
   pfNick = (params.get('nick') || '').trim();
@@ -51,16 +50,15 @@ async function init() {
 
   document.title = `DiVilytics | ${pfNick}`;
 
-  const [chars, { data: viewedProfile }] = await Promise.all([
+  const [chars, viewedProfile] = await Promise.all([
     loadCharacters(),
-    db.from('profiles').select('avatar_url, default_avatar, created_at').eq('nickname', pfNick).maybeSingle(),
+    fetchProfile({ nickname: pfNick }, 'avatar_url, default_avatar, created_at'),
   ]);
   pfAvatarUrl = resolveAvatar(viewedProfile);
   const sinceHTML = viewedProfile?.created_at
     ? `<span class="pf-since">Since ${fmtDateShort(viewedProfile.created_at)}</span>`
     : '';
-  pfChars     = chars;
-  charBoxMap  = Object.fromEntries(chars.map(c => [c.name, c.box]));
+  pfCharBoxMap  = Object.fromEntries(chars.map(c => [c.name, c.box]));
 
   const profile = getCurrentProfile();
   const isOwnProfile = profile && profile.nickname === pfNick;
@@ -93,17 +91,9 @@ async function load() {
 
   const gameIds = [...new Set((myRows || []).map(r => r.game_id))];
 
-  if (!gameIds.length) {
-    pfGames = [];
-    pfPlayers = [];
-  } else {
-    const [{ data: g }, { data: gp }] = await Promise.all([
-      db.from('games').select('*').in('id', gameIds).order('played_at', { ascending: false }),
-      db.from('game_players').select('*').in('game_id', gameIds).order('position'),
-    ]);
-    pfGames   = g  || [];
-    pfPlayers = gp || [];
-  }
+  const { games, players } = await fetchGamesWithPlayers(gameIds, { orderByPlayedAtDesc: true });
+  pfGames   = games;
+  pfPlayers = players;
 
   document.getElementById('pfRoot').className = '';
   render();
@@ -126,7 +116,7 @@ function pfToggleWinsOnly() {
   pfWinsOnly = !pfWinsOnly;
   const btn = document.getElementById('pfWinsOnlyBtn');
   if (btn) btn.classList.toggle('on', pfWinsOnly);
-  pfDisplayLimit = PF_PAGE_SIZE;
+  pfDisplayLimit = PAGE_SIZE;
   _renderGamesList();
 }
 
@@ -138,50 +128,29 @@ function pfJump(ev) {
   return false;
 }
 
-let _pfSearchTimer = null;
-
-async function pfSearchInput(e) {
-  const val      = e.target.value.trim();
-  const dropdown = document.getElementById('pfDropdown');
-
-  if (!val) { dropdown.classList.remove('open'); return; }
-
-  clearTimeout(_pfSearchTimer);
-  _pfSearchTimer = setTimeout(async () => {
-    const { data } = await db
-      .from('profiles')
-      .select('nickname, avatar_url, default_avatar')
-      .ilike('nickname', `${val}%`)
-      .not('nickname', 'is', null)
-      .limit(8);
-
-    const matches = data || [];
-    if (!matches.length) { dropdown.classList.remove('open'); return; }
-
-    populateSearchDropdown(
-      dropdown,
-      matches.map(p => `
-        <div class="cs-option" data-nick="${_esc(p.nickname)}">
-          ${playerAvatarHTML(resolveAvatar(p))}
-          <span>${_esc(p.nickname)}</span>
-        </div>`).join(''),
-      opt => { location.href = `player.html?nick=${encodeURIComponent(opt.dataset.nick)}`; }
-    );
-  }, 200);
-}
-
-function pfSearchBlur() {
-  _handleSearchBlur(document.getElementById('pfDropdown'));
-}
-
-function pfSearchKeydown(e) {
-  _handleSearchKeydown(
-    e,
-    document.getElementById('pfDropdown'),
-    document.getElementById('pfJumpInput'),
-    opt => { location.href = `player.html?nick=${encodeURIComponent(opt.dataset.nick)}`; },
-    v   => { location.href = `player.html?nick=${encodeURIComponent(v)}`; }
-  );
+function _attachPlayerSearch() {
+  const goTo = nick => { location.href = `player.html?nick=${encodeURIComponent(nick)}`; };
+  attachSearchBox({
+    inputId:    'pfJumpInput',
+    dropdownId: 'pfDropdown',
+    debounceMs: 200,
+    fetchOptions: async q => {
+      const { data } = await db
+        .from('profiles')
+        .select('nickname, avatar_url, default_avatar')
+        .ilike('nickname', `${q}%`)
+        .not('nickname', 'is', null)
+        .limit(8);
+      return data || [];
+    },
+    renderOption: p => `
+      <div class="cs-option" data-nick="${_esc(p.nickname)}">
+        ${playerAvatarHTML(resolveAvatar(p))}
+        <span>${_esc(p.nickname)}</span>
+      </div>`,
+    onSelect:      opt => goTo(opt.dataset.nick),
+    onDirectEnter: v   => goTo(v),
+  });
 }
 
 function pfFilteredGameIds() {
@@ -208,17 +177,17 @@ function pfClearLocationFilter() {
 // ── RENDER ────────────────────────────────────────────────────────────────────
 
 function render() {
-  pfDisplayLimit = PF_PAGE_SIZE;
+  pfDisplayLimit = PAGE_SIZE;
   const root = document.getElementById('pfRoot');
 
   if (!pfGames.length) {
-    document.getElementById('pfControls').style.display = 'none';
+    setVisible('pfControls', false);
     root.innerHTML =
       `<div class="empty"><div class="empty-icon">🎭</div><h3>No games yet</h3><p>${_esc(pfNick)} hasn't played any recorded games.</p></div>`;
     return;
   }
 
-  document.getElementById('pfControls').style.display = '';
+  setVisible('pfControls', true);
 
   const keepIds = pfFilteredGameIds();
   const games   = pfGames.filter(g => keepIds.has(g.id));
@@ -237,37 +206,22 @@ function render() {
   // Character tally
   const charMap = {};
   for (const p of mine) {
-    if (!charMap[p.character]) charMap[p.character] = { key: p.character, games: 0, wins: 0 };
+    if (!charMap[p.character]) charMap[p.character] = { character: p.character, games: 0, wins: 0 };
     charMap[p.character].games++;
     if (p.is_winner) charMap[p.character].wins++;
   }
-  let charRows = Object.values(charMap);
-  charRows = sortStatRows(charRows, pfMode);
-
-  const maxWins  = charRows[0]?.wins || 1;
-  const maxPct   = Math.max(...charRows.map(r => r.games ? r.wins / r.games : 0)) || 1;
-  const maxGames = charRows[0]?.games || 1;
-
-  const ranks      = computeRanks(charRows, pfMode);
-  const medalClass = rank => rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+  const charRows = Object.values(charMap);
 
   root.innerHTML = `
     <div class="summary">
-      <div class="stat-box">
-        <div class="stat-val">${winPct}%</div>
-        <div class="stat-lbl">Win rate</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-val">${wins}</div>
-        <div class="stat-lbl">Wins</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-val">${nGames}</div>
-        <div class="stat-lbl">Games</div>
-      </div>
+      ${statBoxesHTML([
+        { val: winPct + '%', lbl: 'Win rate' },
+        { val: wins,         lbl: 'Wins' },
+        { val: nGames,       lbl: 'Games' },
+      ])}
     </div>
 
-    <div class="controls" style="margin-bottom:1rem">
+    <div class="controls mb-1">
       <div class="seg">
         <button class="seg-btn ${pfMode === 'pct'   ? 'on' : ''}" onclick="pfSetMode('pct')"   type="button">% Wins</button>
         <button class="seg-btn ${pfMode === 'count' ? 'on' : ''}" onclick="pfSetMode('count')" type="button"># Wins</button>
@@ -275,41 +229,15 @@ function render() {
       </div>
     </div>
 
-    <div class="lb-table" style="margin-bottom:1.25rem">
-      <div class="lb-head">
-        <span>#</span>
-        <span>Character</span>
-        <span></span>
-        <span style="text-align:right">${pfMode === 'pct' ? '% Wins' : pfMode === 'count' ? '# Wins' : '# Games'}</span>
-        <span style="text-align:right">${pfMode === 'games' ? '# Wins' : '# Games'}</span>
-      </div>
-      ${charRows.map((r, i) => {
-        const rank    = ranks[i];
-        const pct     = r.games ? r.wins / r.games : 0;
-        const barW    = statBarWidth(r, pfMode, maxWins, maxGames, maxPct);
-        const dispVal = pfMode === 'count' ? r.wins : pfMode === 'games' ? r.games : Math.round(pct * 100) + '%';
-        const dispSub = pfMode === 'games' ? r.wins : r.games;
-        const sub     = charBoxMap[r.key] || '';
-        return `
-          <a class="lb-row link" href="characters.html?char=${encodeURIComponent(r.key)}">
-            <div class="rank-num ${medalClass(rank)}">${rank}</div>
-            <div class="row-identity">
-              ${charImgHTML(r.key)}
-              <div>
-                <div class="row-name">${_esc(r.key)}</div>
-                ${sub ? `<div class="row-sub">${_esc(sub)}</div>` : ''}
-              </div>
-            </div>
-            <div class="bar-cell">
-              <div class="bar-bg">
-                <div class="bar-fill${rank === 1 ? ' gold' : ''}" style="width:${barW}%"></div>
-              </div>
-            </div>
-            <div class="row-val">${dispVal}</div>
-            <div class="row-games">${dispSub}</div>
-          </a>`;
-      }).join('')}
-    </div>
+    ${renderStatTableHTML(charRows, {
+      mode:        pfMode,
+      headLabel:   'Character',
+      getKey:      r   => r.character,
+      getHref:     key => `characters.html?char=${encodeURIComponent(key)}`,
+      getIdentity: key => charImgHTML(key),
+      getSub:      key => pfCharBoxMap[key],
+      wrapClass:   'mb-1-25',
+    })}
 
     <div class="pf-games-header">
       <span class="pf-games-title">Games</span>
@@ -352,25 +280,17 @@ function _renderGamesList(keepIds = pfFilteredGameIds()) {
 }
 
 function pfLoadMore() {
-  pfDisplayLimit += PF_PAGE_SIZE;
+  pfDisplayLimit += PAGE_SIZE;
   _renderGamesList();
 }
-function pfCanEditGame(g, gp) {
-  const user = getCurrentUser();
-  if (!user) return false;
-  if (g.created_by === user.id) return true;
-  return gp.some(p => p.user_id === user.id);
-}
-
-
 function buildProfileCard(g, gp) {
-  const editable    = pfCanEditGame(g, gp);
-  const canFillMeta = editable && (!g.duration_minutes || !g.num_turns || !g.location);
-  const actions     = editable ? `
+  const role        = gameUserRole(g, gp, getCurrentUser());
+  const canFillMeta = role.isParticipant && (!g.duration_minutes || !g.num_turns || !g.location);
+  const actions     = role.isParticipant ? `
     <div class="card-actions">
       <button class="btn btn-ghost btn-sm" onclick="pfShowGameQR('${g.id}')">QR Code</button>
       ${canFillMeta ? `<button class="btn btn-ghost btn-sm" onclick="pfEditGame('${g.id}')">Edit</button>` : ''}
-      <button class="btn btn-danger btn-sm" onclick="pfDeleteGame('${g.id}')">Delete</button>
+      ${role.isCreator ? `<button class="btn btn-danger btn-sm" onclick="pfDeleteGame('${g.id}')">Delete</button>` : ''}
     </div>` : '';
   return buildGameCard(g, gp, { isSelf: p => p.nickname === pfNick, actions, onLocationClick: pfSetLocationFilter });
 }
@@ -397,7 +317,7 @@ function pfEditGame(id) {
   trn.disabled = !!g.num_turns;
   loc.disabled = !!g.location;
 
-  document.getElementById('pfEditErr').classList.remove('show');
+  clearError('pfEditErr');
   const btn = document.getElementById('pfEditSaveBtn');
   btn.disabled    = false;
   btn.textContent = 'Save Changes';
@@ -437,8 +357,7 @@ async function pfSaveEdit() {
   const { error } = await db.from('games').update(patch).eq('id', _pfEditingId);
 
   if (error) {
-    errEl.textContent = error.message;
-    errEl.classList.add('show');
+    showError(errEl, error.message);
     btn.disabled    = false;
     btn.textContent = 'Save Changes';
     return;

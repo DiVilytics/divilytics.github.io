@@ -119,33 +119,11 @@ function charSelectHTML(chars, selected = '') {
   return html;
 }
 
-function buildCharGrid(container, chars, selectedSet, onToggle) {
-  const byBox = groupByBox(chars);
-  container.innerHTML = '';
-  for (const [box, cs] of Object.entries(byBox)) {
-    const group = document.createElement('div');
-    group.className = 'box-group';
-    const pillsId = 'bp-' + box.replace(/\s+/g, '_');
-    group.innerHTML = `<div class="box-name">${box}</div><div class="box-pills" id="${pillsId}"></div>`;
-    container.appendChild(group);
-    const pillsEl = group.querySelector('.box-pills');
-    for (const c of cs) {
-      const btn = document.createElement('button');
-      btn.className = 'char-pill' + (selectedSet.has(c.name) ? ' on' : '');
-      btn.innerHTML = charImgHTML(c.name) + _esc(c.name);
-      btn.dataset.name = c.name;
-      btn.onclick = () => {
-        const isOn = selectedSet.has(c.name);
-        if (isOn) { selectedSet.delete(c.name); btn.classList.remove('on'); }
-        else       { selectedSet.add(c.name);    btn.classList.add('on');  }
-        onToggle(c.name, !isOn);
-      };
-      pillsEl.appendChild(btn);
-    }
-  }
-}
-
-function buildExcludeGrid(container, chars, excludedSet, onChange) {
+// Shared pill-grid builder. Pass `activeClass` to control which CSS class
+// represents membership in `set` ("on" for filter selection, "excluded" for
+// the new-game character filter). The `onToggle(name, nowActive)` callback
+// fires after the set + DOM are updated.
+function buildCharPillGrid(container, chars, set, { activeClass = 'on', onToggle } = {}) {
   const byBox = groupByBox(chars);
   container.innerHTML = '';
   for (const [box, cs] of Object.entries(byBox)) {
@@ -156,17 +134,27 @@ function buildExcludeGrid(container, chars, excludedSet, onChange) {
     const pillsEl = group.querySelector('.box-pills');
     for (const c of cs) {
       const btn = document.createElement('button');
-      btn.className = 'char-pill' + (excludedSet.has(c.name) ? ' excluded' : '');
+      btn.type = 'button';
+      btn.className = 'char-pill' + (set.has(c.name) ? ` ${activeClass}` : '');
       btn.innerHTML = charImgHTML(c.name) + _esc(c.name);
       btn.dataset.name = c.name;
       btn.onclick = () => {
-        if (excludedSet.has(c.name)) { excludedSet.delete(c.name); btn.classList.remove('excluded'); }
-        else                          { excludedSet.add(c.name);    btn.classList.add('excluded');    }
-        onChange();
+        const wasOn = set.has(c.name);
+        if (wasOn) { set.delete(c.name); btn.classList.remove(activeClass); }
+        else       { set.add(c.name);    btn.classList.add(activeClass);    }
+        onToggle?.(c.name, !wasOn);
       };
       pillsEl.appendChild(btn);
     }
   }
+}
+
+function buildCharGrid(container, chars, selectedSet, onToggle) {
+  buildCharPillGrid(container, chars, selectedSet, { activeClass: 'on', onToggle });
+}
+
+function buildExcludeGrid(container, chars, excludedSet, onChange) {
+  buildCharPillGrid(container, chars, excludedSet, { activeClass: 'excluded', onToggle: onChange });
 }
 
 // ── FORMATTING ────────────────────────────────────────────────────────────────
@@ -197,6 +185,38 @@ function avg(arr) {
   const valid = arr.filter(x => x != null);
   if (!valid.length) return null;
   return valid.reduce((a, b) => a + b, 0) / valid.length;
+}
+
+// ── DOM HELPERS ───────────────────────────────────────────────────────────────
+
+function _resolveEl(target) {
+  return typeof target === 'string' ? document.getElementById(target) : target;
+}
+
+// Toggle the .hidden utility class. Call as setVisible(id, true|false).
+function setVisible(target, visible) {
+  const el = _resolveEl(target);
+  if (!el) return;
+  el.classList.toggle('hidden', !visible);
+}
+
+// Show an error banner (.err element). The shake animation always re-plays so
+// repeated submits with the same error are still noticeable. Optional
+// `scroll` smooth-scrolls the banner into view.
+function showError(target, msg, { scroll = false } = {}) {
+  const el = _resolveEl(target);
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  // Restart the animation by toggling the trigger class through one reflow.
+  el.classList.remove('shake');
+  void el.offsetWidth;
+  el.classList.add('shake');
+  if (scroll) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function clearError(target) {
+  _resolveEl(target)?.classList.remove('show');
 }
 
 // ── OVERLAYS ──────────────────────────────────────────────────────────────────
@@ -237,6 +257,15 @@ function populateSearchDropdown(dropdown, html, onSelect) {
 
 // ── STATS HELPERS ─────────────────────────────────────────────────────────────
 
+// Renders the standard summary trio: e.g.
+//   statBoxesHTML([{ val: '12', lbl: 'Games' }, { val: '23m', lbl: 'Avg duration' }])
+// Returns an HTML string of three `.stat-box` divs (no wrapping element).
+function statBoxesHTML(boxes) {
+  return boxes.map(b =>
+    `<div class="stat-box"><div class="stat-val">${b.val}</div><div class="stat-lbl">${b.lbl}</div></div>`
+  ).join('');
+}
+
 function sortStatRows(rows, mode) {
   const sorted = [...rows];
   if (mode === 'count') return sorted.sort((a, b) => b.wins - a.wins || b.games - a.games);
@@ -267,7 +296,120 @@ function statBarWidth(r, mode, maxWins, maxGames, maxPct) {
   return Math.round((pct / maxPct) * 100);
 }
 
+// Renders the rank · identity · bar · value · sub stat table. Used by the
+// leaderboard and the player profile (the character-detail stat table has a
+// different shape and is built inline in characters.js).
+//
+// Required opts:
+//   mode          : 'pct' | 'count' | 'games'
+//   headLabel     : column header for the identity column ("Character" | "Player")
+//   getKey(r)     : returns the row's display name (string)
+//   getHref(key)  : returns the link target
+//   getIdentity(key): returns the inline HTML for the row's avatar/portrait
+//   getSub(key)   : optional, returns small grey sub-text under the name
+//   wrapClass     : optional extra class on the `lb-table` wrapper
+function renderStatTableHTML(rows, opts) {
+  const { mode, headLabel, getKey, getHref, getIdentity, getSub, wrapClass = '' } = opts;
+  const sorted = sortStatRows(rows, mode);
+
+  const maxWins  = sorted[0]?.wins  || 1;
+  const maxGames = sorted[0]?.games || 1;
+  const maxPct   = Math.max(...sorted.map(r => r.games ? r.wins / r.games : 0)) || 1;
+
+  const ranks      = computeRanks(sorted, mode);
+  const medalClass = rank => rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+
+  return `
+    <div class="lb-table${wrapClass ? ' ' + wrapClass : ''}">
+      <div class="lb-head">
+        <span>#</span>
+        <span>${headLabel}</span>
+        <span></span>
+        <span class="text-right">${mode === 'count' ? '# Wins' : mode === 'pct' ? '% Wins' : '# Games'}</span>
+        <span class="text-right">${mode === 'games' ? '# Wins' : '# Games'}</span>
+      </div>
+      ${sorted.map((r, i) => {
+        const rank    = ranks[i];
+        const key     = getKey(r);
+        const pct     = r.games ? r.wins / r.games : 0;
+        const barW    = statBarWidth(r, mode, maxWins, maxGames, maxPct);
+        const dispVal = mode === 'count' ? r.wins : mode === 'pct' ? Math.round(pct * 100) + '%' : r.games;
+        const dispSub = mode === 'games' ? r.wins : r.games;
+        const sub     = getSub ? (getSub(key, r) || '') : '';
+        return `
+          <a class="lb-row link" href="${getHref(key, r)}">
+            <div class="rank-num ${medalClass(rank)}">${rank}</div>
+            <div class="row-identity">
+              ${getIdentity(key, r)}
+              <div>
+                <div class="row-name">${_esc(key)}</div>
+                ${sub ? `<div class="row-sub">${_esc(sub)}</div>` : ''}
+              </div>
+            </div>
+            <div class="bar-cell">
+              <div class="bar-bg">
+                <div class="bar-fill${rank === 1 ? ' gold' : ''}" style="width:${barW}%"></div>
+              </div>
+            </div>
+            <div class="row-val">${dispVal}</div>
+            <div class="row-games">${dispSub}</div>
+          </a>`;
+      }).join('')}
+    </div>`;
+}
+
 // ── SEARCH HELPERS ────────────────────────────────────────────────────────────
+
+// Wires up a typeahead input + dropdown. Every page that has a search box
+// previously had three near-identical wrappers (input/blur/keydown) — this
+// helper replaces them with a single registration call.
+//
+// Required opts:
+//   inputId, dropdownId
+//   fetchOptions(query)  : sync or async, returns an array of "option" data
+//   renderOption(item)   : returns the inner HTML string for one .cs-option
+//   onSelect(optionEl)   : called with the chosen .cs-option element
+// Optional:
+//   onDirectEnter(query) : Enter w/ no active option fires this with raw text
+//   onEmpty()            : called when query goes blank (e.g. clear filters)
+//   debounceMs           : 0 = instant; >0 debounces fetchOptions
+function attachSearchBox(opts) {
+  const {
+    inputId, dropdownId,
+    fetchOptions, renderOption,
+    onSelect, onDirectEnter, onEmpty,
+    debounceMs = 0,
+  } = opts;
+  const input    = document.getElementById(inputId);
+  const dropdown = document.getElementById(dropdownId);
+  if (!input || !dropdown) return;
+
+  let timer = null;
+
+  async function _runQuery(val) {
+    const trimmed = val.trim();
+    if (!trimmed) {
+      dropdown.classList.remove('open');
+      onEmpty?.();
+      return;
+    }
+    const matches = await fetchOptions(trimmed);
+    if (!matches || !matches.length) { dropdown.classList.remove('open'); return; }
+    populateSearchDropdown(dropdown, matches.map(renderOption).join(''), onSelect);
+  }
+
+  input.addEventListener('input', e => {
+    const v = e.target.value;
+    if (debounceMs > 0) {
+      clearTimeout(timer);
+      timer = setTimeout(() => _runQuery(v), debounceMs);
+    } else {
+      _runQuery(v);
+    }
+  });
+  input.addEventListener('blur',    () => _handleSearchBlur(dropdown));
+  input.addEventListener('keydown', e  => _handleSearchKeydown(e, dropdown, input, onSelect, onDirectEnter));
+}
 
 function _handleSearchBlur(dropdownEl) {
   setTimeout(() => dropdownEl.classList.remove('open'), 150);
@@ -311,16 +453,31 @@ function copyQrUrl() {
     if (!btn) return;
     const prev = btn.textContent;
     btn.textContent = '✓';
-    btn.style.color = '#4ade80';
-    setTimeout(() => { btn.textContent = prev; btn.style.color = ''; }, 1500);
+    btn.classList.add('copy-success');
+    setTimeout(() => { btn.textContent = prev; btn.classList.remove('copy-success'); }, 1500);
   });
+}
+
+// ── GAME ROLES ────────────────────────────────────────────────────────────────
+
+// Centralizes "what's this user's relationship to this game?" so callers
+// don't re-derive the same booleans inline. Pass the current user object
+// (typically `getCurrentUser()`); a missing user yields all-false.
+function gameUserRole(g, gp, user) {
+  if (!user) return { isCreator: false, isClaimant: false, isParticipant: false };
+  const isCreator  = g.created_by === user.id;
+  const isClaimant = gp.some(p => p.user_id === user.id);
+  return { isCreator, isClaimant, isParticipant: isCreator || isClaimant };
 }
 
 // ── GAME CARD ─────────────────────────────────────────────────────────────────
 
-function buildGameCard(g, gp, { isSelf = () => false, actions = '', onLocationClick = null } = {}) {
+// Pure HTML builder for a game card. The result is meant to be injected into
+// a `<div class="game-card">…</div>` host. Pass `locationClickable: true` to
+// render the location as a button (the caller wires the click handler).
+function buildGameCardHTML(g, gp, { isSelf = () => false, actions = '', locationClickable = false } = {}) {
   const locationPart = g.location
-    ? (onLocationClick ? `<button class="card-loc-btn">${_esc(g.location)}</button>` : _esc(g.location))
+    ? (locationClickable ? `<button class="card-loc-btn">${_esc(g.location)}</button>` : _esc(g.location))
     : null;
   const meta = [
     fmtDuration(g.duration_minutes),
@@ -329,29 +486,40 @@ function buildGameCard(g, gp, { isSelf = () => false, actions = '', onLocationCl
     `${gp.length}p`,
   ].filter(Boolean).join(' · ');
 
-  const card = document.createElement('div');
-  card.className = 'game-card';
-  card.innerHTML = `
+  const chipsHTML = gp.map(p => {
+    const cls = `chip ${p.is_winner ? 'winner' : ''}${isSelf(p) ? ' self' : ''}`;
+    return `<div class="${cls}">
+      ${p.is_winner ? '<span class="win-star">👑</span>' : ''}
+      <a class="char-link chip-img" href="characters.html?char=${encodeURIComponent(p.character)}">${charImgHTML(p.character)}</a>
+      <div class="chip-body">
+        <div class="chip-char"><a class="char-link" href="characters.html?char=${encodeURIComponent(p.character)}">${_esc(p.character)}</a></div>
+        ${p.nickname ? `<div class="chip-nick"><a class="nick-link" href="player.html?nick=${encodeURIComponent(p.nickname)}">${_esc(p.nickname)}</a></div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
     <div class="card-body">
       <div class="card-top">
         <div class="card-date">${fmtDateTime(g.played_at)}</div>
         <div class="card-meta">${meta}</div>
       </div>
-      <div class="card-players">
-        ${gp.map(p => {
-          const cls = `chip ${p.is_winner ? 'winner' : ''}${isSelf(p) ? ' self' : ''}`;
-          return `<div class="${cls}">
-            ${p.is_winner ? '<span class="win-star">👑</span>' : ''}
-            <a class="char-link chip-img" href="characters.html?char=${encodeURIComponent(p.character)}">${charImgHTML(p.character)}</a>
-            <div class="chip-body">
-              <div class="chip-char"><a class="char-link" href="characters.html?char=${encodeURIComponent(p.character)}">${_esc(p.character)}</a></div>
-              ${p.nickname ? `<div class="chip-nick"><a class="nick-link" href="player.html?nick=${encodeURIComponent(p.nickname)}">${_esc(p.nickname)}</a></div>` : ''}
-            </div>
-          </div>`;
-        }).join('')}
-      </div>
+      <div class="card-players">${chipsHTML}</div>
     </div>
     ${actions}`;
+}
+
+// Wrap the HTML in a <div class="game-card"> and attach the optional
+// location-click handler. Callers that just need HTML should call
+// buildGameCardHTML directly.
+function buildGameCard(g, gp, { isSelf, actions, onLocationClick } = {}) {
+  const card = document.createElement('div');
+  card.className = 'game-card';
+  card.innerHTML = buildGameCardHTML(g, gp, {
+    isSelf,
+    actions,
+    locationClickable: !!onLocationClick,
+  });
   if (onLocationClick && g.location) {
     card.querySelector('.card-loc-btn')?.addEventListener('click', e => {
       e.stopPropagation();

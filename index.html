@@ -28,11 +28,11 @@
   <a class="nav-brand" href="index.html"><img src="asset/logo-b.svg" alt="DiVilytics | Disney Villainous Analytics"></a>
   <div class="nav-right">
     <div class="nav-links">
-      <a href="games.html" title="Games">🕒</a>
+      <a href="new-game.html" title="New Game">🎲</a>
+      <a href="game-log.html" title="Game Log">🕒</a>
       <a href="leaderboard.html" title="Leaderboard">🏆</a>
       <a href="characters.html" title="Characters">🎭</a>
       <a href="player.html" id="navProfile" title="Player">👤</a>
-      <a href="draw.html" title="Draw">🎲</a>
     </div>
     <div class="nav-auth" id="navAuth"></div>
   </div>
@@ -76,10 +76,17 @@
   </div>
 
   <div class="home-sections">
-    <a class="home-section-link" href="games.html">
+    <a class="home-section-link" href="new-game.html">
+      <span class="home-section-icon">🎲</span>
+      <div class="home-section-text">
+        <span class="home-section-name">New Game</span>
+        <span class="home-section-desc">Build your villain lineup and start a new game, optionally filtered by speed</span>
+      </div>
+    </a>
+    <a class="home-section-link" href="game-log.html">
       <span class="home-section-icon">🕒</span>
       <div class="home-section-text">
-        <span class="home-section-name">Games</span>
+        <span class="home-section-name">Game Log</span>
         <span class="home-section-desc">Log new games with turns and duration, browse game history</span>
       </div>
     </a>
@@ -104,13 +111,6 @@
         <span class="home-section-desc">Profile, game history, and stats for you or any player</span>
       </div>
     </a>
-    <a class="home-section-link" href="draw.html">
-      <span class="home-section-icon">🎲</span>
-      <div class="home-section-text">
-        <span class="home-section-name">Draw</span>
-        <span class="home-section-desc">Utility to randomly pick a villain or randomize play order</span>
-      </div>
-    </a>
     <div class="home-section-link home-section-static" id="homeThemeRow">
       <span class="home-section-icon" id="homeThemeIcon">☀️</span>
       <div class="home-section-text">
@@ -130,8 +130,8 @@
         <span class="home-section-desc">Sign in with Discord to log games and appear on leaderboards</span>
       </div>
       <div class="home-section-btns">
-        <button class="btn btn-ghost btn-sm" onclick="signInWithDiscord()">⎆</button>
-        <button class="btn btn-ghost btn-sm" onclick="signOut()">⏻</button>
+        <button class="btn btn-ghost btn-sm" title="Sign in"  onclick="signInWithDiscord()">⎆</button>
+        <button class="btn btn-ghost btn-sm" title="Sign out" onclick="signOut()">⏻</button>
       </div>
     </div>
   </div>
@@ -154,6 +154,7 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
 <script src="db.js"></script>
   <script src="ui.js"></script>
   <script src="shared.js"></script>

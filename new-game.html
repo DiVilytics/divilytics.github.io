@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <title>DiVilytics | New Game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" href="/favicon-96x96.png?v=20260506" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20260506" />
+  <link rel="shortcut icon" href="/favicon.ico?v=20260506" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=20260506" />
+  <meta name="apple-mobile-web-app-title" content="DiVilytics" />
+  <link rel="manifest" href="/site.webmanifest?v=20260506" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-6MTR91YL11"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-6MTR91YL11');
+  </script>
+</head>
+<body>
+
+<nav>
+  <a class="nav-brand" href="index.html"><img src="asset/logo-b.svg" alt="DiVilytics | Disney Villainous Analytics"></a>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="new-game.html" title="New Game">🎲</a>
+      <a href="game-log.html" title="Game Log">🕒</a>
+      <a href="leaderboard.html" title="Leaderboard">🏆</a>
+      <a href="characters.html" title="Characters">🎭</a>
+      <a href="player.html" id="navProfile" title="Player">👤</a>
+    </div>
+    <div class="nav-auth" id="navAuth"></div>
+  </div>
+</nav>
+
+<main>
+  <div class="page-header">
+    <h2>New Game</h2>
+    <div class="header-actions">
+      <button class="btn btn-primary btn-sm hidden" id="resumeBtn" onclick="startLive()">Resume</button>
+      <button class="btn btn-ghost btn-sm hidden"   id="discardBtn" onclick="discardLiveGame()">Discard</button>
+    </div>
+  </div>
+
+  <div class="err" id="err"></div>
+
+  <!-- LIVE PANEL — shown only while a live game is running -->
+  <div id="liveContent" class="hidden">
+    <div class="live-status">Game in progress</div>
+    <div class="live-info" id="liveInfo"></div>
+    <div class="live-time" id="liveTime">00:00</div>
+    <div class="live-turns">
+      <button class="live-btn" type="button" onclick="bumpTurn(-1)">−</button>
+      <div class="live-turn-count"><span id="liveTurnCount">0</span><span class="live-turn-lbl">turns</span></div>
+      <button class="live-btn" type="button" onclick="bumpTurn(1)">+</button>
+    </div>
+    <p class="live-hint">Tap + each turn. When you're done, press Pause Game. The duration and the number of turns will be filled in.</p>
+  </div>
+
+  <!-- FORM CONTENT — hidden while a live game is running -->
+  <div id="formContent">
+    <div class="form-row">
+      <div class="field">
+        <label>Date &amp; Time</label>
+        <input type="datetime-local" id="fDate">
+      </div>
+      <div class="field">
+        <label>Location <span class="optional"></span></label>
+        <input type="text" id="fLocation" maxlength="60" placeholder="optional">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>Duration <span class="optional">(min)</span></label>
+        <input type="number" id="fDur" min="1" max="999" placeholder="optional">
+      </div>
+      <div class="field">
+        <label>Turns <span class="optional"></span></label>
+        <input type="number" id="fTurns" min="1" max="999" placeholder="optional">
+      </div>
+    </div>
+
+    <div class="section-label">
+      <span>Draw Character Mode</span>
+      <button class="btn btn-primary btn-sm" id="drawAllBtn" type="button" onclick="drawAllEmpty()">Draw all empty</button>
+    </div>
+    <div class="draw-mode-row">
+      <select class="draw-mode-select" id="drawModeSel" onchange="setDrawMode(this.value)">
+        <option value="random">Random</option>
+        <option value="speed">Speed</option>
+        <option value="speedplus">Speed+</option>
+      </select>
+      <div class="speed-colors hidden" id="speedColors">
+        <button class="speed-color green"  data-speed="green"  onclick="setSpeedColor('green')"  type="button" title="Green"></button>
+        <button class="speed-color yellow" data-speed="yellow" onclick="setSpeedColor('yellow')" type="button" title="Yellow"></button>
+        <button class="speed-color orange" data-speed="orange" onclick="setSpeedColor('orange')" type="button" title="Orange"></button>
+        <button class="speed-color red"    data-speed="red"    onclick="setSpeedColor('red')"    type="button" title="Red"></button>
+      </div>
+      <button class="exclude-toggle exclude-toggle-inline" type="button" onclick="toggleExclude()">
+        <span class="exclude-toggle-label">Exclude</span>
+        <div class="toggle-right">
+          <span class="badge" id="exBadge"></span>
+          <span class="chevron" id="exChevron">▼</span>
+        </div>
+      </button>
+    </div>
+    <div class="exclude-body" id="excludeBody">
+      <div class="exclude-locked-hint hidden" id="excludeLockedHint">Filter is controlled by speed mode</div>
+      <div class="filter-actions">
+        <button class="txt-btn" onclick="excludeAll()">Exclude all</button>
+        <span class="sep">|</span>
+        <button class="txt-btn" onclick="clearExcluded()">Clear</button>
+        <button class="btn btn-primary btn-sm filter-apply-btn" onclick="applyExclude()">Apply filter</button>
+      </div>
+      <div id="excludeGrid"></div>
+    </div>
+
+    <div class="section-label">
+      <span>Players</span>
+      <span class="players-legend">(🎲 = draw | 👤 = you | 👑 = winner | ❌ = remove)</span>
+      <select id="playerCountSel" class="players-count-select" onchange="setPlayerCount(this.value)">
+        <option value="2">2p</option>
+        <option value="3">3p</option>
+        <option value="4">4p</option>
+        <option value="5">5p</option>
+        <option value="6">6p</option>
+      </select>
+    </div>
+    <div id="orderSlots"></div>
+    <button class="add-row-btn" id="orderAddBtn" onclick="addOrderSlot()">+ Add player</button>
+
+  </div>
+
+  <!-- FOOTER actions -->
+  <div id="footerDefault" class="new-game-footer">
+    <button class="btn btn-success" id="startBtn"  onclick="startLive()">Start Game</button>
+    <button class="btn btn-ghost"   id="submitBtn" onclick="submitForm()">Save Game</button>
+  </div>
+  <div id="footerLive" class="new-game-footer hidden">
+    <button class="btn btn-danger" onclick="stopLive()">Pause Game</button>
+  </div>
+</main>
+
+<!-- QR Code overlay (after save) -->
+<div class="overlay" id="qrOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <h3>Share with players</h3>
+      <button class="sheet-close" onclick="closeQR()">×</button>
+    </div>
+    <div class="sheet-body">
+      <p class="modal-hint">Other players can scan this QR code to claim their character and appear in the game record.</p>
+      <div class="qr-wrap">
+        <div id="qrCode"></div>
+      </div>
+      <div class="qr-url-row">
+        <div class="qr-url" id="qrUrlText"></div>
+        <button class="pf-btn" onclick="copyQrUrl()" title="Copy link">⎘</button>
+      </div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn btn-primary" onclick="closeQR()">Done</button>
+    </div>
+  </div>
+</div>
+
+<audio id="bgAudio" src="asset/empty.mp3" preload="metadata" loop></audio>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="config.js"></script>
+<script src="db.js"></script>
+<script src="ui.js"></script>
+<script src="shared.js"></script>
+<script src="new-game.js"></script>
+<script src="new-game-audio.js"></script>
+</body>
+</html>

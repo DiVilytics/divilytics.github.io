@@ -11,6 +11,7 @@ async function init() {
   if (!user) { location.href = 'index.html'; return; }
   _acctChars = await loadCharacters();
   _renderPage();
+  _renderStatsCard();
 }
 
 function _onAuthChange() {
@@ -21,11 +22,14 @@ function _onAuthChange() {
 
 function _renderPage() {
   const profile = getCurrentProfile();
+  const user    = getCurrentUser();
   _acctNick     = profile?.nickname   || null;
   _acctAvatar   = profile?.avatar_url || null;
   _acctFallback = profile?.default_avatar || 'asset/player.svg';
 
-  const since = profile?.created_at ? fmtDateShort(profile.created_at) : null;
+  const since   = profile?.created_at ? `Since ${fmtDateShort(profile.created_at)}` : null;
+  const email   = user?.email ? `Discord: ${user.email}` : null;
+  const metaLn  = [since, email].filter(Boolean).join(' | ');
 
   const root = document.getElementById('acctRoot');
   root.className = '';
@@ -35,122 +39,219 @@ function _renderPage() {
         src="${_esc(_acctAvatar || _acctFallback)}"
         onerror="this.src='${_esc(_acctFallback)}'" alt="">
       <div>
-        <div class="acct-nick">${_esc(_acctNick || '—')}</div>
-        ${since ? `<div class="pf-since">Since ${_esc(since)}</div>` : ''}
+        <div class="acct-nick">${_esc(_acctNick || '|')}</div>
+        ${metaLn ? `<div class="pf-since">${_esc(metaLn)}</div>` : ''}
       </div>
     </div>
 
+    <div id="acctStats"></div>
+
     <div class="acct-section">
-      <div class="section-label">Player icon</div>
+      <div class="section-label">
+        <span>Player icon</span>
+        <button class="btn btn-ghost btn-sm" id="removeAvatarBtn" onclick="removeAvatar()" ${_acctAvatar ? '' : 'disabled'}>Use default icon</button>
+      </div>
       <div class="err" id="avatarErr"></div>
       <div class="avatar-picker" id="avatarPicker"></div>
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <button class="btn btn-primary btn-sm" id="saveAvatarBtn" onclick="saveAvatar()">Save icon</button>
-        <button class="btn btn-ghost btn-sm" id="removeAvatarBtn" onclick="removeAvatar()">Remove icon</button>
-      </div>
     </div>
 
     <div class="acct-section">
-      <div class="section-label">Profile</div>
+      <div class="section-label">Account</div>
       <div class="acct-actions">
-        <button class="btn btn-ghost" onclick="showProfileQR()">Share Profile</button>
-        <button class="btn btn-ghost" onclick="changeNickname()">Change Nickname</button>
+        <button class="btn btn-ghost" onclick="changeNickname()">Change nickname</button>
+        <button class="btn btn-ghost" id="exportDataBtn" onclick="exportMyData()">Download my data</button>
         <button class="btn btn-ghost" onclick="signOut()">Sign out</button>
       </div>
     </div>
 
     <div class="acct-section acct-danger">
       <div class="section-label">Danger zone</div>
-      <button class="btn btn-danger" onclick="openDeleteAccount()">Delete Profile</button>
+      <button class="btn btn-danger" onclick="openDeleteAccount()">Delete profile</button>
     </div>
   `;
 
   _buildAvatarPicker();
 }
 
+// ── STATS CARD ───────────────────────────────────────────────────────────────
+
+async function _renderStatsCard() {
+  const host = document.getElementById('acctStats');
+  if (!host || !_acctNick) return;
+  const { data } = await db
+    .from('player_stats')
+    .select('wins, games')
+    .eq('nickname', _acctNick)
+    .maybeSingle();
+  if (!data || !data.games) { host.innerHTML = ''; return; }
+
+  const winPct = Math.round((data.wins / data.games) * 100);
+  host.innerHTML = `
+    <div class="summary">
+      ${statBoxesHTML([
+        { val: winPct + '%', lbl: 'Win rate' },
+        { val: data.wins,    lbl: 'Wins' },
+        { val: data.games,   lbl: 'Games' },
+      ])}
+    </div>
+    <div class="acct-actions acct-stats-actions">
+      <a class="btn btn-ghost btn-sm" href="player.html?nick=${encodeURIComponent(_acctNick)}">View full profile →</a>
+      <button class="btn btn-ghost btn-sm" onclick="showProfileQR()">Share profile</button>
+    </div>
+  `;
+}
+
+// ── DATA EXPORT ──────────────────────────────────────────────────────────────
+
+async function exportMyData() {
+  const user = getCurrentUser();
+  if (!user) return;
+  const btn = document.getElementById('exportDataBtn');
+  btn.disabled    = true;
+  btn.textContent = 'Preparing…';
+
+  try {
+    const [profile, { data: gamePlayers }] = await Promise.all([
+      fetchProfile({ id: user.id }),
+      db.from('game_players').select('*').eq('user_id', user.id),
+    ]);
+
+    const payload = {
+      exported_at: new Date().toISOString(),
+      auth_user:   { id: user.id, email: user.email },
+      profile:     profile || null,
+      game_players: gamePlayers || [],
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0, 10);
+    a.href     = url;
+    a.download = `DiVilytics-${_acctNick || user.id}-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    btn.textContent = 'Downloaded ✓';
+    setTimeout(() => { btn.disabled = false; btn.textContent = 'Download my data'; }, 1500);
+  } catch (e) {
+    console.error('exportMyData failed:', e);
+    btn.disabled    = false;
+    btn.textContent = 'Download failed. Retry';
+  }
+}
+
 function _buildAvatarPicker() {
   const picker = document.getElementById('avatarPicker');
   if (!picker) return;
-  const options = [
-    ...Array.from({ length:19 }, (_, i) => ({
-      label: `Player ${i + 1}`,
-      value: `asset/players/${i + 1}.jpeg`,
-      src:   `asset/players/${i + 1}.jpeg`,
-    })),
-  ];
   picker.innerHTML = '';
-  for (const opt of options) {
-    const img = document.createElement('img');
-    img.className = 'avatar-option' + ((opt.value ?? '') === (_acctAvatar ?? '') ? ' selected' : '');
-    img.src   = opt.src;
-    img.alt   = opt.label;
-    img.dataset.value = opt.value ?? '';
+  for (let i = 1; i <= 19; i++) {
+    const value = `asset/players/${i}.jpeg`;
+    const img   = document.createElement('img');
+    img.className = 'avatar-option' + (value === _acctAvatar ? ' selected' : '');
+    img.src   = value;
+    img.alt   = `Player ${i}`;
+    img.dataset.value = value;
     img.onerror = () => { img.src = 'asset/player.svg'; };
-    img.onclick = () => {
-      _acctAvatar = opt.value;
-      picker.querySelectorAll('.avatar-option').forEach(el => el.classList.remove('selected'));
-      img.classList.add('selected');
-    };
+    img.onclick = () => _selectAvatar(value);
     picker.appendChild(img);
   }
 }
 
-// ── SAVE AVATAR ───────────────────────────────────────────────────────────────
+// ── AVATAR ACTIONS ───────────────────────────────────────────────────────────
 
-async function saveAvatar() {
+// Click-to-save: optimistically updates the picker + nav, persists in the
+// background, and reverts on error.
+async function _selectAvatar(value) {
+  if (value === _acctAvatar) return;
   const user = getCurrentUser();
   if (!user) return;
 
-  const btn   = document.getElementById('saveAvatarBtn');
-  const errEl = document.getElementById('avatarErr');
-  btn.disabled    = true;
-  btn.textContent = 'Saving…';
-  errEl.classList.remove('show');
+  const previous = _acctAvatar;
+  _acctAvatar = value;
+  document.querySelectorAll('#avatarPicker .avatar-option').forEach(el => {
+    el.classList.toggle('selected', el.dataset.value === value);
+  });
+  document.getElementById('acctAvatarPreview').src = value;
+  _syncRemoveBtn();
+  clearError('avatarErr');
+  _updateAuthUI();
 
-  const { error } = await db.from('profiles').update({ avatar_url: _acctAvatar }).eq('id', user.id);
-
+  const { error } = await db.from('profiles').update({ avatar_url: value }).eq('id', user.id);
   if (error) {
-    errEl.textContent = error.message;
-    errEl.classList.add('show');
-    btn.disabled    = false;
-    btn.textContent = 'Save icon';
+    _acctAvatar = previous;
+    document.querySelectorAll('#avatarPicker .avatar-option').forEach(el => {
+      el.classList.toggle('selected', el.dataset.value === (previous ?? ''));
+    });
+    document.getElementById('acctAvatarPreview').src = previous || _acctFallback;
+    _syncRemoveBtn();
+    _updateAuthUI();
+    showError('avatarErr', error.message);
+  }
+}
+
+// Keep the "Use default icon" button's disabled state in sync with whether
+// a custom avatar is currently set.
+function _syncRemoveBtn() {
+  const btn = document.getElementById('removeAvatarBtn');
+  if (btn) btn.disabled = !_acctAvatar;
+}
+
+// Two-step inline confirmation: first click flips the button to "Confirm?";
+// a second click within 3s actually removes; otherwise it reverts.
+let _removeConfirmTimer = null;
+
+function removeAvatar() {
+  const btn = document.getElementById('removeAvatarBtn');
+  if (!btn) return;
+
+  if (!btn.dataset.confirming) {
+    btn.dataset.confirming = '1';
+    btn.textContent = 'Confirm?';
+    btn.classList.remove('btn-ghost');
+    btn.classList.add('btn-danger');
+    if (_removeConfirmTimer) clearTimeout(_removeConfirmTimer);
+    _removeConfirmTimer = setTimeout(() => {
+      delete btn.dataset.confirming;
+      btn.textContent = 'Use default icon';
+      btn.classList.remove('btn-danger');
+      btn.classList.add('btn-ghost');
+    }, 3000);
     return;
   }
 
-  const preview = document.getElementById('acctAvatarPreview');
-  if (preview) preview.src = _acctAvatar || _acctFallback;
-  _updateAuthUI();   // refresh nav avatar
-  btn.textContent = 'Saved!';
-  setTimeout(() => { btn.disabled = false; btn.textContent = 'Save icon'; }, 1500);
+  clearTimeout(_removeConfirmTimer);
+  delete btn.dataset.confirming;
+  btn.classList.remove('btn-danger');
+  btn.classList.add('btn-ghost');
+  _doRemoveAvatar();
 }
 
-async function removeAvatar() {
+async function _doRemoveAvatar() {
   const user = getCurrentUser();
   if (!user) return;
-
-  const btn   = document.getElementById('removeAvatarBtn');
-  const errEl = document.getElementById('avatarErr');
+  const btn = document.getElementById('removeAvatarBtn');
   btn.disabled    = true;
-  btn.textContent = 'Removing…';
-  errEl.classList.remove('show');
+  btn.textContent = 'Updating…';
+  clearError('avatarErr');
 
   const { error } = await db.from('profiles').update({ avatar_url: null }).eq('id', user.id);
-
   if (error) {
-    errEl.textContent = error.message;
-    errEl.classList.add('show');
+    showError('avatarErr', error.message);
     btn.disabled    = false;
-    btn.textContent = 'Remove icon';
+    btn.textContent = 'Use default icon';
     return;
   }
 
   _acctAvatar = null;
-  document.getElementById('avatarPicker').querySelectorAll('.avatar-option').forEach(el => el.classList.remove('selected'));
-  const preview = document.getElementById('acctAvatarPreview');
-  if (preview) preview.src = _acctFallback;
+  document.querySelectorAll('#avatarPicker .avatar-option').forEach(el => el.classList.remove('selected'));
+  document.getElementById('acctAvatarPreview').src = _acctFallback;
   _updateAuthUI();
-  btn.textContent = 'Removed!';
-  setTimeout(() => { btn.disabled = false; btn.textContent = 'Remove icon'; }, 1500);
+  btn.textContent = 'Done!';
+  // Stay disabled. Re're already on the default now. Rut rename back after the flash.
+  setTimeout(() => { btn.textContent = 'Use default icon'; _syncRemoveBtn(); }, 1500);
 }
 
 // ── SHARE PROFILE QR ─────────────────────────────────────────────────────────
@@ -179,7 +280,7 @@ function changeNickname() {
 
 function openDeleteAccount() {
   document.getElementById('delAccountInput').value = '';
-  document.getElementById('delAccountErr').classList.remove('show');
+  clearError('delAccountErr');
   _syncDelBtn();
   openOverlay('delAccountOverlay');
   setTimeout(() => document.getElementById('delAccountInput')?.focus(), 120);
@@ -198,8 +299,7 @@ function _syncDelBtn() {
 
 async function confirmDeleteAccount() {
   const errEl = document.getElementById('delAccountErr');
-  errEl.textContent = '';
-  errEl.classList.remove('show');
+  clearError(errEl);
 
   const user = getCurrentUser();
   if (!user) return;
@@ -208,27 +308,17 @@ async function confirmDeleteAccount() {
   btn.disabled    = true;
   btn.textContent = 'Deleting…';
 
-  const { error: gpErr } = await db
-    .from('game_players')
-    .update({ nickname: null })
-    .eq('user_id', user.id);
-
-  if (gpErr) {
-    errEl.textContent = gpErr.message;
-    errEl.classList.add('show');
+  const fail = msg => {
+    showError(errEl, msg);
     btn.disabled    = false;
     btn.textContent = 'Delete my profile';
-    return;
-  }
+  };
+
+  const { error: gpErr } = await db.from('game_players').update({ nickname: null }).eq('user_id', user.id);
+  if (gpErr) return fail(gpErr.message);
 
   const { error } = await db.from('profiles').delete().eq('id', user.id);
-  if (error) {
-    errEl.textContent = error.message;
-    errEl.classList.add('show');
-    btn.disabled    = false;
-    btn.textContent = 'Delete my profile';
-    return;
-  }
+  if (error) return fail(error.message);
 
   await db.auth.signOut();
   location.href = 'index.html';

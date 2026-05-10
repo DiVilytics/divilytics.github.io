@@ -128,7 +128,7 @@ function _ensureClaimConfirmModal() {
           <button class="sheet-close" onclick="cancelClaim()">×</button>
         </div>
         <div class="sheet-body">
-          <p class="confirm-text">You're about to claim <strong id="claimConfirmChar" style="color:var(--text)"></strong> in this game. This can't be undone!</p>
+          <p class="confirm-text">You're about to claim <strong id="claimConfirmChar" class="text-emph"></strong> in this game. This can't be undone!</p>
         </div>
         <div class="sheet-footer sheet-footer-row">
           <button class="btn btn-ghost"   onclick="cancelClaim()">Cancel</button>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+	<title>DiVilytics | Game Log</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="style.css">
+	<link rel="icon" type="image/png" href="/favicon-96x96.png?v=20260506" sizes="96x96" />
+	<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20260506" />
+	<link rel="shortcut icon" href="/favicon.ico?v=20260506" />
+	<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=20260506" />
+	<meta name="apple-mobile-web-app-title" content="DiVilytics" />
+	<link rel="manifest" href="/site.webmanifest?v=20260506" />
+	<!-- Google tag (gtag.js) -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-6MTR91YL11"></script>
+	<script>
+		window.dataLayer = window.dataLayer || [];
+		function gtag(){dataLayer.push(arguments);}
+		gtag('js', new Date());
+		gtag('config', 'G-6MTR91YL11');
+	</script>
+</head>
+<body>
+
+<nav>
+	<a class="nav-brand" href="index.html"><img src="asset/logo-b.svg" alt="DiVilytics | Disney Villainous Analytics"></a>
+	<div class="nav-right">
+		<div class="nav-links">
+			<a href="new-game.html" title="New Game">🎲</a>
+			<a href="game-log.html" title="Game Log">🕒</a>
+			<a href="leaderboard.html" title="Leaderboard">🏆</a>
+			<a href="characters.html" title="Characters">🎭</a>
+			<a href="player.html" id="navProfile" title="Player">👤</a>
+		</div>
+		<div class="nav-auth" id="navAuth"></div>
+	</div>
+</nav>
+
+<main>
+	<div class="page-header">
+		<h2>Game Log</h2>
+		<div class="cs-search hidden" id="locationSearch">
+			<input type="text" id="locationSearchInput" placeholder="Filter by location…" autocomplete="off">
+			<div class="cs-dropdown" id="locationDropdown"></div>
+		</div>
+	</div>
+
+	<!-- Filters -->
+	<div class="filter-bar">
+		<div class="pill-group" id="countPills">
+			<button class="pill on" onclick="setCountFilter('all')">All</button>
+			<button class="pill" onclick="setCountFilter(2)">2p</button>
+			<button class="pill" onclick="setCountFilter(3)">3p</button>
+			<button class="pill" onclick="setCountFilter(4)">4p</button>
+			<button class="pill" onclick="setCountFilter(5)">5p</button>
+			<button class="pill" onclick="setCountFilter(6)">6p</button>
+		</div>
+		<button class="filter-char-toggle" onclick="toggleCharFilter()" id="charFilterToggle">
+			<span>Filter by character</span>
+			<div class="toggle-right">
+				<span class="badge" id="charBadge"></span>
+				<span class="chevron" id="charChevron">▼</span>
+			</div>
+		</button>
+		<div class="filter-char-panel" id="charFilterPanel">
+			<div class="filter-actions">
+				<button class="txt-btn" onclick="selectAllChars()">Select all</button>
+				<span class="sep">|</span>
+				<button class="txt-btn" onclick="clearChars()">Clear</button>
+				<button class="btn btn-primary btn-sm filter-apply-btn" onclick="applyCharFilter()">Apply filter</button>
+			</div>
+			<div id="charGrid"></div>
+		</div>
+	</div>
+
+	<div class="list-header">
+		<div class="results-hint" id="resultsHint"></div>
+		<div id="locationPillArea"></div>
+		<a class="btn btn-primary btn-sm" href="new-game.html">+ New Game</a>
+	</div>
+	<div id="root" class="spinner">Loading…</div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="db.js"></script>
+<script src="ui.js"></script>
+<script src="shared.js"></script>
+<script src="game-log.js"></script>
+
+</body>
+</html>
