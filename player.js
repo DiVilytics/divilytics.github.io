@@ -419,7 +419,7 @@ function _showAchDetail(charName) {
   const body  = document.getElementById('achBody');
   const title = document.getElementById('achTitle');
   if (!body || !title) return;
-  title.textContent = charName;
+  title.textContent = pfNick ? `Achievements | ${pfNick}` : 'Achievements';
   body.innerHTML = renderAchievementDetailHTML(charName, pfAch.get(charName));
   openOverlay('achOverlay');
 }

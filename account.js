@@ -402,7 +402,7 @@ function _showAchDetail(charName) {
   const body = document.getElementById('achBody');
   const title = document.getElementById('achTitle');
   if (!body || !title) return;
-  title.textContent = charName;
+  title.textContent = _acctNick ? `Achievements | ${_acctNick}` : 'Achievements';
   body.innerHTML = renderAchievementDetailHTML(charName, _acctAch.get(charName));
   openOverlay('achOverlay');
 }

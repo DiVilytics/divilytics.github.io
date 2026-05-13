@@ -410,11 +410,14 @@ function renderAchievementsGridHTML(charAch, allChars, onClickFn = '_showAchDeta
     const stats = charAch.get(c.name) || { plays: 0, wins: 0 };
     return `
       <button class="ach-tile" data-char="${_esc(c.name)}" onclick="${onClickFn}(this.dataset.char)" type="button" title="${_esc(c.name)}">
-        <img class="ach-tile-img" src="${charImgSrc(c.name)}" onerror="this.src='asset/player.svg'" alt="${_esc(c.name)}">
-        <div class="ach-tile-rows">
-          <div class="ach-tile-row" aria-label="Plays"><span class="ach-row-icon">🎲:</span>${topMedal(stats.plays)}</div>
-          <div class="ach-tile-row" aria-label="Wins"><span class="ach-row-icon">👑:</span>${topMedal(stats.wins)}</div>
+        <div class="ach-tile-main">
+          <img class="ach-tile-img" src="${charImgSrc(c.name)}" onerror="this.src='asset/player.svg'" alt="${_esc(c.name)}">
+          <div class="ach-tile-rows">
+            <div class="ach-tile-row" aria-label="Plays"><span class="ach-row-icon">🎲:</span>${topMedal(stats.plays)}</div>
+            <div class="ach-tile-row" aria-label="Wins"><span class="ach-row-icon">👑:</span>${topMedal(stats.wins)}</div>
+          </div>
         </div>
+        <div class="ach-tile-name">${_esc(c.name)}</div>
       </button>`;
   }).join('');
   return `
