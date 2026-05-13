@@ -87,20 +87,26 @@
 
     <div class="section-label">
       <span>Draw Character Mode</span>
-      <button class="btn btn-primary btn-sm" id="drawAllBtn" type="button" onclick="drawAllEmpty()">Draw all empty</button>
+      <div class="header-actions">
+        <button class="btn btn-primary btn-sm" id="drawAllEmptyBtn" type="button" onclick="drawAllEmpty()">Draw empty</button>
+        <button class="btn btn-primary btn-sm" id="drawAllBtn" type="button" onclick="drawAll()">Draw all</button>
+      </div>
     </div>
     <div class="draw-mode-row">
       <select class="draw-mode-select" id="drawModeSel" onchange="setDrawMode(this.value)">
         <option value="random">Random</option>
-        <option value="speed">Speed</option>
-        <option value="speedplus">Speed+</option>
+        <option value="pace">Pace</option>
+        <option value="paceplus">Pace+</option>
       </select>
-      <div class="speed-colors hidden" id="speedColors">
-        <button class="speed-color green"  data-speed="green"  onclick="setSpeedColor('green')"  type="button" title="Green"></button>
-        <button class="speed-color yellow" data-speed="yellow" onclick="setSpeedColor('yellow')" type="button" title="Yellow"></button>
-        <button class="speed-color orange" data-speed="orange" onclick="setSpeedColor('orange')" type="button" title="Orange"></button>
-        <button class="speed-color red"    data-speed="red"    onclick="setSpeedColor('red')"    type="button" title="Red"></button>
+      <div class="pace-colors hidden" id="paceColors">
+        <button class="pace-color green"  data-pace="green"  onclick="setPaceColor('green')"  type="button" title="Green"></button>
+        <button class="pace-color yellow" data-pace="yellow" onclick="setPaceColor('yellow')" type="button" title="Yellow"></button>
+        <button class="pace-color orange" data-pace="orange" onclick="setPaceColor('orange')" type="button" title="Orange"></button>
+        <button class="pace-color red"    data-pace="red"    onclick="setPaceColor('red')"    type="button" title="Red"></button>
       </div>
+      <button class="exclude-toggle exclude-toggle-inline owned-toggle" id="ownedOnlyBtn" type="button" onclick="toggleOwnedOnly()">
+        <span class="exclude-toggle-label">Mine</span>
+      </button>
       <button class="exclude-toggle exclude-toggle-inline" type="button" onclick="toggleExclude()">
         <span class="exclude-toggle-label">Exclude</span>
         <div class="toggle-right">
@@ -110,7 +116,7 @@
       </button>
     </div>
     <div class="exclude-body" id="excludeBody">
-      <div class="exclude-locked-hint hidden" id="excludeLockedHint">Filter is controlled by speed mode</div>
+      <div class="exclude-locked-hint hidden" id="excludeLockedHint">Filter is controlled by pace mode</div>
       <div class="filter-actions">
         <button class="txt-btn" onclick="excludeAll()">Exclude all</button>
         <span class="sep">|</span>
@@ -123,13 +129,16 @@
     <div class="section-label">
       <span>Players</span>
       <span class="players-legend">(🎲 = draw | 👤 = you | 👑 = winner | ❌ = remove)</span>
-      <select id="playerCountSel" class="players-count-select" onchange="setPlayerCount(this.value)">
-        <option value="2">2p</option>
-        <option value="3">3p</option>
-        <option value="4">4p</option>
-        <option value="5">5p</option>
-        <option value="6">6p</option>
-      </select>
+      <div class="header-actions">
+        <button class="btn btn-primary btn-sm" id="shuffleOrderBtn" type="button" onclick="shuffleOrder()">Shuffle order</button>
+        <select id="playerCountSel" class="players-count-select" onchange="setPlayerCount(this.value)">
+          <option value="2">2p</option>
+          <option value="3">3p</option>
+          <option value="4">4p</option>
+          <option value="5">5p</option>
+          <option value="6">6p</option>
+        </select>
+      </div>
     </div>
     <div id="orderSlots"></div>
     <button class="add-row-btn" id="orderAddBtn" onclick="addOrderSlot()">+ Add player</button>

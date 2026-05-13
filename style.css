@@ -16,7 +16,7 @@
    14. BOTTOM SHEET   overlay, sheet, sheet-{header,body,footer}
    15. FORM           inputs, labels, .form-row, section-label
    16. LEADERBOARD    .lb-table, summary stat boxes, ranks/bars
-   17. CHARACTER PICKER avatar grid, .seg, .speed-color, .exclude-toggle
+   17. CHARACTER PICKER avatar grid, .seg, .pace-color, .exclude-toggle
    18. PLAYER SLOTS   new-game order-slot rows + dice/me/winner buttons
    19. QR CODE        QR overlay sizing
    20. CLAIM PAGE     join.html row layout
@@ -273,7 +273,7 @@ a.chip {
   line-height: 1.5;
 }
 
-.speed-dot {
+.pace-dot {
   display: inline-block;
   width: 10px;
   height: 10px;
@@ -282,10 +282,10 @@ a.chip {
   vertical-align: 1px;
   flex-shrink: 0;
 }
-.speed-dot.green  { background: #4ade80; }
-.speed-dot.yellow { background: #facc15; }
-.speed-dot.orange { background: #fb923c; }
-.speed-dot.red    { background: #e05454; }
+.pace-dot.green  { background: #4ade80; }
+.pace-dot.yellow { background: #facc15; }
+.pace-dot.orange { background: #fb923c; }
+.pace-dot.red    { background: #e05454; }
 
 /* ── LIVE GAME PANEL ──────────────────────────────────────────────── */
 .live-status {
@@ -854,7 +854,9 @@ select optgroup { background: #1a1a1a; color: var(--muted); font-style: normal; 
 #formContent .section-label { margin: 10px 0 6px; min-height: 28px; }
 #formContent .form-row + .section-label { margin-top: 2px; }
 #formContent .section-label > .btn-sm,
-#formContent .section-label > .players-count-select { margin: -2px 0; }
+#formContent .section-label > .players-count-select,
+#formContent .section-label .header-actions .btn-sm,
+#formContent .section-label .header-actions .players-count-select { margin: -2px 0; }
 
 .players-count-select {
   width: auto;
@@ -1130,6 +1132,61 @@ select:disabled {
 }
 .avatar-option.selected { border-color: var(--accent); opacity: 1; }
 
+.box-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 10px;
+  padding: 4px 0 8px;
+}
+.box-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: var(--s1);
+  border: 0;
+  border-radius: var(--rs);
+  padding: 6px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--muted);
+  transition: color 0.15s;
+}
+.box-option img {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: contain;
+  border-radius: var(--rs);
+  filter: grayscale(1);
+  opacity: 0.45;
+  transition: filter 0.15s, opacity 0.15s;
+}
+.box-option-name { font-size: 12px; font-weight: 600; text-align: center; line-height: 1.2; }
+.box-option-year { font-size: 11px; }
+.box-option.selected { color: var(--text); }
+.box-option.selected img { filter: none; opacity: 1; }
+.box-option.selected::after {
+  content: '✓';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+@media (hover: hover) {
+  .box-option:hover img { filter: none; opacity: 0.85; }
+}
+
 .draw-mode-row {
   display: flex;
   align-items: center;
@@ -1149,8 +1206,8 @@ select:disabled {
   flex-shrink: 0;
   background-position: right 8px center;
 }
-.speed-colors { display: flex; gap: 4px; flex-shrink: 0; }
-.speed-color {
+.pace-colors { display: flex; gap: 4px; flex-shrink: 0; }
+.pace-color {
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -1159,17 +1216,16 @@ select:disabled {
   padding: 0;
   transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
 }
-.speed-color.green  { background: #4ade80; }
-.speed-color.yellow { background: #facc15; }
-.speed-color.orange { background: #fb923c; }
-.speed-color.red    { background: #e05454; }
-.speed-color:hover  { transform: scale(1.08); }
-.speed-color.on     { border-color: var(--text); box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px currentColor; }
+.pace-color.green  { background: #4ade80; }
+.pace-color.yellow { background: #facc15; }
+.pace-color.orange { background: #fb923c; }
+.pace-color.red    { background: #e05454; }
+.pace-color:hover  { transform: scale(1.08); }
+.pace-color.on     { border-color: var(--text); box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px currentColor; }
 
 /* Inline variant — sits in the same row as the mode select */
 .exclude-toggle.exclude-toggle-inline {
   width: auto;
-  margin-left: auto;
   padding: 5px 10px;
   font-size: 12px;
   font-weight: 600;
@@ -1177,7 +1233,14 @@ select:disabled {
   flex-shrink: 0;
   gap: 6px;
 }
+.draw-mode-row > .exclude-toggle.exclude-toggle-inline:first-of-type { margin-left: auto; }
 .exclude-toggle.exclude-toggle-inline .toggle-right { gap: 6px; }
+.owned-toggle.on {
+  background: var(--accent-d);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.owned-toggle.disabled { opacity: 0.45; }
 .exclude-toggle-inline ~ .exclude-body,
 .draw-mode-row + .exclude-body {
   border-top: 1px solid var(--border);
@@ -1448,7 +1511,63 @@ select:disabled {
   margin-bottom: 8px;
   letter-spacing: -0.01em;
 }
-.cs-month-text { flex: 1; text-align: center; }
+.cs-month-picker-wrap { flex: 1; position: relative; display: flex; justify-content: center; }
+.cs-month-text {
+  text-align: center;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+}
+@media (hover: hover) {
+  .cs-month-text:hover { color: var(--accent); }
+}
+.cs-month-picker-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 10px;
+  min-width: 220px;
+}
+.cs-month-picker-panel.open { display: block; }
+.cs-mp-year {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cs-mp-year-text { font-weight: 700; font-size: 14px; }
+.cs-mp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.cs-mp-month {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--rs);
+  padding: 6px 0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+.cs-mp-month.selected { background: var(--accent); color: #fff; border-color: var(--accent); }
+.cs-mp-month:disabled { opacity: 0.35; cursor: not-allowed; }
+@media (hover: hover) {
+  .cs-mp-month:not(:disabled):not(.selected):hover { background: var(--s3); }
+}
 .cs-month-nav {
   background: var(--s2);
   border: 1px solid var(--border);
@@ -1863,7 +1982,7 @@ select:disabled {
   .cs-table .lb-head, .cs-table .lb-row { grid-template-columns: 68px 1fr 56px 44px; }
   .form-row input { font-size: 13px; }
   .draw-mode-row                  { gap: 6px; }
-  .draw-mode-row .speed-color     { width: 24px; height: 24px; }
+  .draw-mode-row .pace-color     { width: 24px; height: 24px; }
   .draw-mode-row .draw-mode-select { padding-right: 22px; }
 }
 

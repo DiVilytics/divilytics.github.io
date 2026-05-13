@@ -292,7 +292,8 @@ function buildProfileCard(g, gp) {
       ${canFillMeta ? `<button class="btn btn-ghost btn-sm" onclick="pfEditGame('${g.id}')">Edit</button>` : ''}
       ${role.isCreator ? `<button class="btn btn-danger btn-sm" onclick="pfDeleteGame('${g.id}')">Delete</button>` : ''}
     </div>` : '';
-  return buildGameCard(g, gp, { isSelf: p => p.nickname === pfNick, actions, onLocationClick: pfSetLocationFilter });
+  const me = getCurrentUser();
+  return buildGameCard(g, gp, { isSelf: p => me && p.user_id === me.id, actions, onLocationClick: pfSetLocationFilter });
 }
 
 // ── GAME ACTIONS ──────────────────────────────────────────────────────────────

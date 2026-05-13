@@ -33,7 +33,7 @@ const liveGame = (() => {
     markStopped(durMs)   { _exactDurMs = durMs; _start = null; },
     setTurns(n)          { _turns = n; },
     bumpTurns(delta) {
-      _turns = Math.max(1, _turns + delta);
+      _turns = Math.max(0, _turns + delta);
       this.emit('turnBump');
     },
 
@@ -165,7 +165,11 @@ async function _loadProfile() {
 function getCurrentUser()    { return _currentUser; }
 function getCurrentProfile() { return _currentProfile; }
 
+const _preSignInHooks = [];
+function onBeforeSignIn(fn) { _preSignInHooks.push(fn); }
+
 async function signInWithDiscord() {
+  for (const fn of _preSignInHooks) { try { fn(); } catch (_) {} }
   await db.auth.signInWithOAuth({
     provider: 'discord',
     options: { redirectTo: window.location.href },

@@ -101,6 +101,12 @@ async function loadCharFaq() {
   return _charFaq;
 }
 
+let _boxInfo = null;
+async function loadBoxInfo() {
+  if (!_boxInfo) _boxInfo = await _fetchJson(DATA_BOX_INFO_URL);
+  return _boxInfo;
+}
+
 // ── CHARACTER CACHE ───────────────────────────────────────────────────────────
 
 let _chars = null;

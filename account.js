@@ -1,7 +1,9 @@
-let _acctChars    = [];
-let _acctAvatar   = null;
-let _acctNick     = null;
-let _acctFallback = 'asset/player.svg';
+let _acctChars      = [];
+let _acctAvatar     = null;
+let _acctNick       = null;
+let _acctFallback   = 'asset/player.svg';
+let _acctBoxInfo    = {};
+let _acctOwnedBoxes = new Set();
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
@@ -9,7 +11,14 @@ async function init() {
   await initAuth(() => _onAuthChange());
   const user = getCurrentUser();
   if (!user) { location.href = 'index.html'; return; }
-  _acctChars = await loadCharacters();
+  const [chars, boxInfo, ownedRes] = await Promise.all([
+    loadCharacters(),
+    loadBoxInfo(),
+    db.from('profile_boxes').select('box').eq('user_id', user.id),
+  ]);
+  _acctChars      = chars;
+  _acctBoxInfo    = boxInfo;
+  _acctOwnedBoxes = new Set((ownedRes.data || []).map(r => r.box));
   _renderPage();
   _renderStatsCard();
 }
@@ -56,6 +65,12 @@ function _renderPage() {
     </div>
 
     <div class="acct-section">
+      <div class="section-label">My boxes</div>
+      <div class="err" id="boxesErr"></div>
+      <div class="box-picker" id="boxPicker"></div>
+    </div>
+
+    <div class="acct-section">
       <div class="section-label">Account</div>
       <div class="acct-actions">
         <button class="btn btn-ghost" onclick="changeNickname()">Change nickname</button>
@@ -71,6 +86,52 @@ function _renderPage() {
   `;
 
   _buildAvatarPicker();
+  _buildBoxPicker();
+}
+
+function _buildBoxPicker() {
+  const picker = document.getElementById('boxPicker');
+  if (!picker) return;
+  const boxNames = [...new Set(_acctChars.map(c => c.box).filter(Boolean))];
+  boxNames.sort((a, b) => {
+    const oa = _acctBoxInfo[a]?.order ?? 999;
+    const ob = _acctBoxInfo[b]?.order ?? 999;
+    return oa - ob || a.localeCompare(b);
+  });
+  picker.innerHTML = boxNames.map(box => {
+    const info  = _acctBoxInfo[box] || {};
+    const owned = _acctOwnedBoxes.has(box);
+    const src   = info.slug ? `asset/boxes/${info.slug}.webp` : 'asset/player.svg';
+    const year  = info.year ? `<span class="box-option-year">${info.year}</span>` : '';
+    return `
+      <button class="box-option${owned ? ' selected' : ''}" data-box="${_esc(box)}" type="button" onclick="_toggleBox(this.dataset.box)" title="${_esc(box)}">
+        <img src="${src}" alt="${_esc(box)}" onerror="this.src='asset/player.svg'">
+        <span class="box-option-name">${_esc(box)}</span>
+        ${year}
+      </button>`;
+  }).join('');
+}
+
+async function _toggleBox(box) {
+  const user = getCurrentUser();
+  if (!user) return;
+  const wasOwned = _acctOwnedBoxes.has(box);
+  if (wasOwned) _acctOwnedBoxes.delete(box);
+  else          _acctOwnedBoxes.add(box);
+  const btn = document.querySelector(`.box-option[data-box="${CSS.escape(box)}"]`);
+  if (btn) btn.classList.toggle('selected', !wasOwned);
+  clearError('boxesErr');
+
+  const { error } = wasOwned
+    ? await db.from('profile_boxes').delete().eq('user_id', user.id).eq('box', box)
+    : await db.from('profile_boxes').insert({ user_id: user.id, box });
+
+  if (error) {
+    if (wasOwned) _acctOwnedBoxes.add(box);
+    else          _acctOwnedBoxes.delete(box);
+    if (btn) btn.classList.toggle('selected', wasOwned);
+    showError('boxesErr', error.message);
+  }
 }
 
 // ── STATS CARD ───────────────────────────────────────────────────────────────

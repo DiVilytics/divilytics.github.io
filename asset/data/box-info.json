@@ -1,0 +1,11 @@
+{
+  "The Worst Takes It All": { "order": 1, "year": 2018, "slug": "the_worst_takes_it_all" },
+  "Wicked to the Core":     { "order": 2, "year": 2019, "slug": "wicked_to_the_core" },
+  "Evil Comes Prepared":    { "order": 3, "year": 2019, "slug": "evil_comes_prepared" },
+  "Perfectly Wretched":     { "order": 4, "year": 2020, "slug": "perfectly_wretched" },
+  "Despicable Plots":       { "order": 5, "year": 2021, "slug": "despicable_plots" },
+  "Bigger and Badder":      { "order": 6, "year": 2022, "slug": "bigger_and_badder" },
+  "Filled with Fright":     { "order": 7, "year": 2023, "slug": "filled_with_fright" },
+  "Sugar and Spite":        { "order": 8, "year": 2024, "slug": "sugar_and_spite" },
+  "Treacherous Tides":      { "order": 9, "year": 2025, "slug": "treacherous_tides" }
+}

@@ -1,10 +1,12 @@
 // ── STATE ─────────────────────────────────────────────────────────────────────
 
 let chars            = [];
-let excluded         = new Set();   // currently excluded (manual ∪ auto-by-speed)
+let excluded         = new Set();   // currently excluded (manual ∪ auto-by-pace ∪ auto-by-ownership)
 let manualExcluded   = new Set();   // user-toggled exclusions, preserved across mode switches
-let drawMode         = 'random';    // 'random' | 'speed' | 'speedplus'
-let speedColor       = null;        // 'green' | 'yellow' | 'orange' | 'red' | null
+let drawMode         = 'random';    // 'random' | 'pace' | 'paceplus'
+let paceColor        = null;        // 'green' | 'yellow' | 'orange' | 'red' | null
+let ownedBoxes       = new Set();   // boxes owned by the signed-in user
+let ownedOnly        = false;       // when true, exclude characters not in ownedBoxes
 let orderSlots       = [];          // each: { id, char, isMe, isWinner }
 let orderNextId      = 0;
 let slotTimers       = {};          // slotId → setInterval id (active spin animation)
@@ -16,7 +18,7 @@ let liveTimerId     = null;        // 1s clock ticker
 let _saveIntervalId = null;        // 30s background-persist
 let _resumeTickId   = null;        // resume-banner ticker (set in _checkResume)
 
-const SPEED_ORDER = ['green', 'yellow', 'orange', 'red'];
+const PACE_ORDER = ['green', 'yellow', 'orange', 'red'];
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
@@ -24,8 +26,14 @@ async function init() {
   setActiveNav('new-game.html');
   // Re-render slots whenever auth state changes so the Me-locked indicator
   // updates in-place after sign-in / sign-out.
-  await initAuth(() => { if (orderSlots.length) renderOrderSlots(); });
+  await initAuth(async () => {
+    await _loadOwnedBoxes();
+    _updateOwnedToggleUI();
+    _recomputeExcluded();
+    if (orderSlots.length) renderOrderSlots();
+  });
   chars = await loadCharacters();
+  await _loadOwnedBoxes();
   buildExcludeGrid(
     document.getElementById('excludeGrid'),
     chars,
@@ -34,10 +42,83 @@ async function init() {
   );
   // Default date = now (local time)
   _setDateToNow();
-  addOrderSlot();
-  addOrderSlot();
+  onBeforeSignIn(_savePendingState);
+  const restored = _restorePendingState();
+  if (!restored) {
+    addOrderSlot();
+    addOrderSlot();
+  }
+  _updateOwnedToggleUI();
   _initDrag();
   _checkResume();
+}
+
+async function _loadOwnedBoxes() {
+  const user = getCurrentUser();
+  if (!user) { ownedBoxes = new Set(); return; }
+  const { data } = await db.from('profile_boxes').select('box').eq('user_id', user.id);
+  ownedBoxes = new Set((data || []).map(r => r.box));
+}
+
+// Pending-state survives the OAuth round-trip (sessionStorage = same tab only)
+// so users don't lose their draft if they sign in mid-edit.
+const PENDING_KEY = 'newGamePending';
+
+function _savePendingState() {
+  const hasContent = orderSlots.some(s => s.char || s.isMe || s.isWinner) ||
+                     document.getElementById('fLocation')?.value ||
+                     document.getElementById('fDur')?.value ||
+                     document.getElementById('fTurns')?.value;
+  if (!hasContent) return;
+  try {
+    sessionStorage.setItem(PENDING_KEY, JSON.stringify({
+      slots:          orderSlots.map(s => ({ char: s.char, isMe: s.isMe, isWinner: s.isWinner })),
+      fDate:          document.getElementById('fDate')?.value     || '',
+      fLocation:      document.getElementById('fLocation')?.value || '',
+      fDur:           document.getElementById('fDur')?.value      || '',
+      fTurns:         document.getElementById('fTurns')?.value    || '',
+      drawMode,
+      paceColor,
+      ownedOnly,
+      manualExcluded: [...manualExcluded],
+    }));
+  } catch (_) {}
+}
+
+function _restorePendingState() {
+  const raw = sessionStorage.getItem(PENDING_KEY);
+  if (!raw) return false;
+  sessionStorage.removeItem(PENDING_KEY);
+
+  // A saved live game is newer and more authoritative; let _checkResume handle it.
+  if (liveGame.loadSaved()) return false;
+
+  let state;
+  try { state = JSON.parse(raw); } catch (_) { return false; }
+  if (!state || !state.slots || !state.slots.length) return false;
+
+  if (state.fDate)     document.getElementById('fDate').value     = state.fDate;
+  if (state.fLocation) document.getElementById('fLocation').value = state.fLocation;
+  if (state.fDur)      document.getElementById('fDur').value      = state.fDur;
+  if (state.fTurns)    document.getElementById('fTurns').value    = state.fTurns;
+
+  orderSlots = state.slots.map(s => ({
+    id:       orderNextId++,
+    char:     s.char || '',
+    isMe:     !!s.isMe,
+    isWinner: !!s.isWinner,
+  }));
+
+  if (state.manualExcluded?.length) manualExcluded = new Set(state.manualExcluded);
+  if (state.ownedOnly) ownedOnly = true;
+  if (state.drawMode && state.drawMode !== 'random') {
+    setDrawMode(state.drawMode);
+    if (state.paceColor) setPaceColor(state.paceColor);
+  } else {
+    _recomputeExcluded();
+  }
+  renderOrderSlots();
+  return true;
 }
 
 function _setDateToNow() {
@@ -49,7 +130,7 @@ function _setDateToNow() {
 
 // User clicked an exclude-grid pill. Sync the change into manualExcluded so
 // it survives mode switches (and so manual un-excludes don't get clobbered
-// when we re-apply the speed filter).
+// when we re-apply the pace filter).
 function _onPillToggle(name, nowExcluded) {
   if (nowExcluded) manualExcluded.add(name);
   else             manualExcluded.delete(name);
@@ -96,16 +177,16 @@ function applyExclude() {
   chevron.classList.remove('open');
 }
 
-// ── DRAW MODE / SPEED ────────────────────────────────────────────────────────
+// ── DRAW MODE / PACE ─────────────────────────────────────────────────────────
 
 function setDrawMode(mode) {
   drawMode = mode;
   const sel = document.getElementById('drawModeSel');
   if (sel && sel.value !== mode) sel.value = mode;
-  setVisible('speedColors', mode !== 'random');
+  setVisible('paceColors', mode !== 'random');
   if (mode === 'random') {
-    speedColor = null;
-    document.querySelectorAll('#speedColors .speed-color').forEach(b => b.classList.remove('on'));
+    paceColor = null;
+    document.querySelectorAll('#paceColors .pace-color').forEach(b => b.classList.remove('on'));
   }
 
   const locked = mode !== 'random';
@@ -116,34 +197,72 @@ function setDrawMode(mode) {
   _updateActionBtns();
 }
 
-function setSpeedColor(color) {
-  speedColor = speedColor === color ? null : color;
-  document.querySelectorAll('#speedColors .speed-color').forEach(b => {
-    b.classList.toggle('on', b.dataset.speed === speedColor);
+function setPaceColor(color) {
+  paceColor = paceColor === color ? null : color;
+  document.querySelectorAll('#paceColors .pace-color').forEach(b => {
+    b.classList.toggle('on', b.dataset.pace === paceColor);
   });
   _recomputeExcluded();
   _updateActionBtns();
 }
 
-function _allowedSpeeds() {
-  if (drawMode === 'random' || !speedColor) return null;
-  if (drawMode === 'speed') return new Set([speedColor]);
-  const i = SPEED_ORDER.indexOf(speedColor);
-  return new Set(SPEED_ORDER.slice(Math.max(0, i - 1), Math.min(SPEED_ORDER.length, i + 2)));
+function _allowedPaces() {
+  if (drawMode === 'random' || !paceColor) return null;
+  if (drawMode === 'pace') return new Set([paceColor]);
+  const i = PACE_ORDER.indexOf(paceColor);
+  return new Set(PACE_ORDER.slice(Math.max(0, i - 1), Math.min(PACE_ORDER.length, i + 2)));
 }
 
 function _recomputeExcluded() {
-  const allowed = _allowedSpeeds();
+  const allowed = _allowedPaces();
   excluded = new Set(manualExcluded);
   if (allowed) {
     for (const c of chars) {
-      if (!allowed.has(c.speed)) excluded.add(c.name);
+      if (!allowed.has(c.pace)) excluded.add(c.name);
+    }
+  }
+  if (ownedOnly && ownedBoxes.size) {
+    for (const c of chars) {
+      if (!ownedBoxes.has(c.box)) excluded.add(c.name);
     }
   }
   document.querySelectorAll('#excludeGrid .char-pill').forEach(btn => {
     btn.classList.toggle('excluded', excluded.has(btn.dataset.name));
   });
   updateExcludeUI();
+}
+
+function toggleOwnedOnly() {
+  if (!getCurrentUser()) {
+    showErr('Sign in to filter by owned boxes.');
+    return;
+  }
+  if (!ownedBoxes.size) {
+    showErr('Mark which boxes you own on the account page first.');
+    return;
+  }
+  ownedOnly = !ownedOnly;
+  _updateOwnedToggleUI();
+  _recomputeExcluded();
+  _updateActionBtns();
+  _saveLiveState();
+}
+
+function _updateOwnedToggleUI() {
+  const btn = document.getElementById('ownedOnlyBtn');
+  if (!btn) return;
+  const enabled = !!getCurrentUser() && ownedBoxes.size > 0;
+  btn.classList.toggle('on', ownedOnly && enabled);
+  btn.classList.toggle('disabled', !enabled);
+  btn.title = !getCurrentUser()
+    ? 'Sign in to filter by owned boxes'
+    : !ownedBoxes.size
+      ? 'Mark which boxes you own on the account page first'
+      : (ownedOnly ? 'Showing only characters from your boxes' : 'Show only characters from your boxes');
+  if (!enabled && ownedOnly) {
+    ownedOnly = false;
+    _recomputeExcluded();
+  }
 }
 
 // ── SLOT MANAGEMENT ──────────────────────────────────────────────────────────
@@ -251,6 +370,25 @@ function drawAllEmpty() {
   empties.forEach((s, i) => setTimeout(() => drawSlot(s.id), i * 60));
 }
 
+function drawAll() {
+  for (const id of Object.keys(slotTimers)) { clearInterval(slotTimers[id]); }
+  slotTimers = {};
+  for (const s of orderSlots) s.char = '';
+  renderOrderSlots();
+  drawAllEmpty();
+}
+
+function shuffleOrder() {
+  for (const id of Object.keys(slotTimers)) { clearInterval(slotTimers[id]); }
+  slotTimers = {};
+  for (let i = orderSlots.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [orderSlots[i], orderSlots[j]] = [orderSlots[j], orderSlots[i]];
+  }
+  renderOrderSlots();
+  _saveLiveState();
+}
+
 function renderOrderSlots() {
   const container = document.getElementById('orderSlots');
 
@@ -294,16 +432,26 @@ function renderOrderSlots() {
 function _updateActionBtns() {
   const filled     = orderSlots.filter(s => s.char).length;
   const empties    = orderSlots.length - filled;
-  const needsColor = drawMode !== 'random' && !speedColor;
+  const needsColor = drawMode !== 'random' && !paceColor;
 
-  const drawAllBtn = document.getElementById('drawAllBtn');
-  const startBtn   = document.getElementById('startBtn');
-  const submitBtn  = document.getElementById('submitBtn');
+  const drawAllEmptyBtn = document.getElementById('drawAllEmptyBtn');
+  const drawAllBtn      = document.getElementById('drawAllBtn');
+  const shuffleBtn      = document.getElementById('shuffleOrderBtn');
+  const startBtn        = document.getElementById('startBtn');
+  const submitBtn       = document.getElementById('submitBtn');
 
+  if (drawAllEmptyBtn) {
+    drawAllEmptyBtn.disabled = empties === 0 || needsColor;
+    drawAllEmptyBtn.title    = needsColor ? 'Pick a pace first' :
+                               empties === 0 ? 'All slots are filled' : '';
+  }
   if (drawAllBtn) {
-    drawAllBtn.disabled = empties === 0 || needsColor;
-    drawAllBtn.title    = needsColor ? 'Pick a speed color first' :
-                          empties === 0 ? 'All slots are filled' : '';
+    drawAllBtn.disabled = needsColor;
+    drawAllBtn.title    = needsColor ? 'Pick a pace first' : '';
+  }
+  if (shuffleBtn) {
+    shuffleBtn.disabled = filled < 2;
+    shuffleBtn.title    = filled < 2 ? 'Pick at least 2 characters first' : '';
   }
   // Start / Save are fully validated in their handlers; we only gate them on
   // the "fill at least 2 slots" minimum here so the UI stays honest.
@@ -386,7 +534,7 @@ function bumpTurn(delta) {
   document.getElementById('liveTurnCount').textContent = liveGame.turns;
   if (!liveTimerId) {
     const fTurns = document.getElementById('fTurns');
-    if (fTurns) fTurns.value = liveGame.turns;
+    if (fTurns) fTurns.value = liveGame.turns || '';
   }
   _saveLiveState();
 }
@@ -415,7 +563,7 @@ function startLive() {
 
   _setDateToNow();
 
-  liveGame.setTurns(parseInt(document.getElementById('fTurns').value) || 1);
+  liveGame.setTurns(parseInt(document.getElementById('fTurns').value) || 0);
   document.getElementById('liveTurnCount').textContent = liveGame.turns;
 
   const playerCount = orderSlots.length;
@@ -503,8 +651,10 @@ function discardLiveGame() {
   manualExcluded.clear();
   excluded.clear();
   setDrawMode('random');
-  speedColor = null;
-  document.querySelectorAll('#speedColors .speed-color').forEach(b => b.classList.remove('on'));
+  paceColor = null;
+  ownedOnly = false;
+  _updateOwnedToggleUI();
+  document.querySelectorAll('#paceColors .pace-color').forEach(b => b.classList.remove('on'));
   document.querySelectorAll('#excludeGrid .char-pill').forEach(b => b.classList.remove('excluded'));
   updateExcludeUI();
 

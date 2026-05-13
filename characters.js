@@ -4,7 +4,7 @@
 // Currently-selected month for the roster report (first day of that month).
 let csReportMonth = (() => {
   const n = new Date();
-  return new Date(n.getFullYear(), n.getMonth() - 1, 1);
+  return new Date(n.getFullYear(), n.getMonth(), 1);
 })();
 
 // Aggregates character stats from the games played in `monthStart`'s calendar
@@ -36,18 +36,86 @@ async function _loadMonthCharacterStats(monthStart) {
   return { stats: [...agg.values()], label, gameCount: ids.length };
 }
 
-function _isCurrentOrFutureMonth(d) {
+function _isFutureMonth(d) {
   const now = new Date();
   return d.getFullYear() > now.getFullYear()
-      || (d.getFullYear() === now.getFullYear() && d.getMonth() >= now.getMonth());
+      || (d.getFullYear() === now.getFullYear() && d.getMonth() > now.getMonth());
 }
 
 async function csShiftMonth(delta) {
   const next = new Date(csReportMonth.getFullYear(), csReportMonth.getMonth() + delta, 1);
-  // Block navigating into the current or future months.
-  if (delta > 0 && _isCurrentOrFutureMonth(next)) return;
+  if (delta > 0 && _isFutureMonth(next)) return;
   csReportMonth = next;
   await _renderMonthlyReport();
+}
+
+let _csPickerYear = null;
+
+function csOpenMonthPicker(ev) {
+  ev?.stopPropagation();
+  const panel = document.getElementById('csMonthPickerPanel');
+  if (!panel) return;
+  const isOpen = panel.classList.contains('open');
+  if (isOpen) { csCloseMonthPicker(); return; }
+  _csPickerYear = csReportMonth.getFullYear();
+  _renderMonthPickerPanel();
+  panel.classList.add('open');
+  setTimeout(() => document.addEventListener('click', _csOutsideClick), 0);
+}
+
+function csCloseMonthPicker() {
+  const panel = document.getElementById('csMonthPickerPanel');
+  if (!panel) return;
+  panel.classList.remove('open');
+  document.removeEventListener('click', _csOutsideClick);
+}
+
+function _csOutsideClick(e) {
+  const panel = document.getElementById('csMonthPickerPanel');
+  if (!panel || panel.contains(e.target)) return;
+  csCloseMonthPicker();
+}
+
+function csPickerShiftYear(delta, ev) {
+  ev?.stopPropagation();
+  const now = new Date();
+  const next = _csPickerYear + delta;
+  if (next > now.getFullYear()) return;
+  _csPickerYear = next;
+  _renderMonthPickerPanel();
+}
+
+async function csPickerSelect(month, ev) {
+  ev?.stopPropagation();
+  const next = new Date(_csPickerYear, month, 1);
+  if (_isFutureMonth(next)) return;
+  csCloseMonthPicker();
+  csReportMonth = next;
+  await _renderMonthlyReport();
+}
+
+function _renderMonthPickerPanel() {
+  const panel = document.getElementById('csMonthPickerPanel');
+  if (!panel) return;
+  const now      = new Date();
+  const curY     = csReportMonth.getFullYear();
+  const curM     = csReportMonth.getMonth();
+  const nextYDis = _csPickerYear >= now.getFullYear();
+  const months   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  panel.innerHTML = `
+    <div class="cs-mp-year">
+      <button class="cs-month-nav" type="button" onclick="csPickerShiftYear(-1, event)" title="Previous year">‹</button>
+      <span class="cs-mp-year-text">${_csPickerYear}</span>
+      <button class="cs-month-nav" type="button" onclick="csPickerShiftYear(1, event)" title="Next year"${nextYDis ? ' disabled' : ''}>›</button>
+    </div>
+    <div class="cs-mp-grid">
+      ${months.map((mn, i) => {
+        const disabled = _csPickerYear > now.getFullYear()
+                      || (_csPickerYear === now.getFullYear() && i > now.getMonth());
+        const selected = _csPickerYear === curY && i === curM;
+        return `<button class="cs-mp-month${selected ? ' selected' : ''}" type="button" onclick="csPickerSelect(${i}, event)"${disabled ? ' disabled' : ''}>${mn}</button>`;
+      }).join('')}
+    </div>`;
 }
 
 async function _renderMonthlyReport() {
@@ -59,13 +127,16 @@ async function _renderMonthlyReport() {
 }
 
 function _renderRosterSummary(rows, monthLabel, gameCount) {
-  const nextDisabled = _isCurrentOrFutureMonth(
+  const nextDisabled = _isFutureMonth(
     new Date(csReportMonth.getFullYear(), csReportMonth.getMonth() + 1, 1)
   );
   const header = monthLabel
     ? `<div class="cs-summary-header">
          <button class="cs-month-nav" type="button" onclick="csShiftMonth(-1)" title="Previous month">‹</button>
-         <span class="cs-month-text">Monthly report: ${_esc(monthLabel)} (${gameCount} ${gameCount === 1 ? 'game' : 'games'})</span>
+         <span class="cs-month-picker-wrap">
+           <button class="cs-month-text" type="button" onclick="csOpenMonthPicker(event)" title="Pick month">Monthly report: ${_esc(monthLabel)} (${gameCount} ${gameCount === 1 ? 'game' : 'games'})</button>
+           <div class="cs-month-picker-panel" id="csMonthPickerPanel" role="dialog" aria-label="Pick month"></div>
+         </span>
          <button class="cs-month-nav" type="button" onclick="csShiftMonth(1)" title="Next month"${nextDisabled ? ' disabled' : ''}>›</button>
        </div>`
     : '';
@@ -195,9 +266,9 @@ async function renderDetailPage(charName) {
 async function _renderCharIdentity() {
   const objectives = await loadObjectives();
   const objective  = objectives[csChar.name];
-  const speedDot   = csChar.speed ? `<span class="speed-dot ${csChar.speed}" title="${_esc(csChar.speed)}"></span>` : '';
+  const paceDot    = csChar.pace ? `<span class="pace-dot ${csChar.pace}" title="${_esc(csChar.pace)}"></span>` : '';
   document.getElementById('csIdentity').innerHTML =
-    `<div class="pf-identity"><img class="char-portrait identity-portrait" src="${charImgSrc(csChar.name)}" alt=""><span class="pf-name-block"><span class="pf-nick">${_esc(csChar.name)}</span><span class="pf-since">${_esc(csChar.box)}</span></span></div>${objective ? `<p class="char-objective">${speedDot}${_esc(objective)}</p>` : ''}`;
+    `<div class="pf-identity"><img class="char-portrait identity-portrait" src="${charImgSrc(csChar.name)}" alt=""><span class="pf-name-block"><span class="pf-nick">${_esc(csChar.name)}</span><span class="pf-since">${_esc(csChar.box)}</span></span></div>${objective ? `<p class="char-objective">${paceDot}${_esc(objective)}</p>` : ''}`;
 }
 
 function _foldBuckets(buckets) {
