@@ -90,8 +90,8 @@ function render({ rows, summary }) {
 
   document.getElementById('summary').innerHTML = statBoxesHTML([
     { val: games,                                  lbl: 'Games' },
-    { val: avgDur   != null ? avgDur + 'm' : '—',  lbl: 'Avg duration' },
-    { val: avgTurns != null ? avgTurns      : '—', lbl: 'Avg turns' },
+    { val: avgDur   != null ? avgDur + 'm' : '|',  lbl: 'Avg duration' },
+    { val: avgTurns != null ? avgTurns      : '|', lbl: 'Avg turns' },
   ]);
 
   if (!rows.length) {

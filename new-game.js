@@ -677,7 +677,7 @@ function _checkResume() {
   banner.innerHTML = `
     <div class="resume-banner-text">
       <strong>Game in progress</strong>
-      <span>${state.slots.length} players · Turn ${state.liveTurns}<span id="resumeElapsed"></span></span>
+      <span>${state.slots.length} players | Turn ${state.liveTurns}<span id="resumeElapsed"></span></span>
     </div>
     <div class="resume-banner-btns">
       <button class="btn btn-primary btn-sm" onclick="_doResume()">Resume</button>
@@ -687,11 +687,11 @@ function _checkResume() {
 
   const elapsedEl = document.getElementById('resumeElapsed');
   if (state.liveStart) {
-    const tick = () => { elapsedEl.textContent = ` · ${fmtElapsed(Date.now() - state.liveStart)}`; };
+    const tick = () => { elapsedEl.textContent = ` | ${fmtElapsed(Date.now() - state.liveStart)}`; };
     tick();
     _resumeTickId = setInterval(tick, 1000);
   } else if (state.fDurExactMs) {
-    elapsedEl.textContent = ` · ${fmtElapsed(state.fDurExactMs)}`;
+    elapsedEl.textContent = ` | ${fmtElapsed(state.fDurExactMs)}`;
   }
 }
 

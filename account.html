@@ -73,6 +73,18 @@
   </div>
 </div>
 
+<!-- Achievement detail sheet -->
+<div class="overlay" id="achOverlay" onclick="if(event.target===this) _closeAchOverlay()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <h3 id="achTitle">Achievement</h3>
+      <button class="sheet-close" onclick="_closeAchOverlay()">×</button>
+    </div>
+    <div class="sheet-body" id="achBody"></div>
+  </div>
+</div>
+
 <!-- QR Code sheet -->
 <div class="overlay" id="acctQrOverlay">
   <div class="sheet">

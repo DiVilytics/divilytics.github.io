@@ -5,6 +5,8 @@ let pfGames     = [];   // games this nickname appeared in
 let pfPlayers   = [];   // all players for those games
 let pfCharBoxMap  = {};
 let pfAvatarUrl = null;
+let pfAllChars  = [];
+let pfAch       = new Map();
 
 let pfMode           = 'pct';   // 'pct' | 'count' | 'games'
 let pfFilter         = 'all';   // 'all' | 2..6
@@ -54,6 +56,7 @@ async function init() {
     loadCharacters(),
     fetchProfile({ nickname: pfNick }, 'avatar_url, default_avatar, created_at'),
   ]);
+  pfAllChars  = chars;
   pfAvatarUrl = resolveAvatar(viewedProfile);
   const sinceHTML = viewedProfile?.created_at
     ? `<span class="pf-since">Since ${fmtDateShort(viewedProfile.created_at)}</span>`
@@ -94,6 +97,7 @@ async function load() {
   const { games, players } = await fetchGamesWithPlayers(gameIds, { orderByPlayedAtDesc: true });
   pfGames   = games;
   pfPlayers = players;
+  pfAch     = computeCharacterAchievements(players.filter(p => p.nickname === pfNick));
 
   document.getElementById('pfRoot').className = '';
   render();
@@ -239,9 +243,18 @@ function render() {
       wrapClass:   'mb-1-25',
     })}
 
+    ${(() => {
+      const { earned, total } = countAchievements(pfAch, pfAllChars);
+      return `
+        <div class="pf-games-header">
+          <span class="pf-games-title">Achievements · ${earned} / ${total}</span>
+        </div>`;
+    })()}
+    ${renderAchievementsGridHTML(pfAch, pfAllChars)}
+
     <div class="pf-games-header">
       <span class="pf-games-title">Games</span>
-      ${pfLocationFilter ? `<button class="pill on" onclick="pfClearLocationFilter()" type="button">${_esc(pfLocationFilter)} · Clear</button>` : ''}
+      ${pfLocationFilter ? `<button class="pill on" onclick="pfClearLocationFilter()" type="button">${_esc(pfLocationFilter)} | Clear</button>` : ''}
       <button class="pill" id="pfWinsOnlyBtn" onclick="pfToggleWinsOnly()" type="button">Wins only</button>
     </div>
     <div class="games-list" id="pfGamesList"></div>
@@ -399,6 +412,19 @@ async function pfConfirmDeleteGame() {
 function closeProfileQR() {
   closeOverlay('qrOverlay');
 }
+
+// ── ACHIEVEMENT DETAIL ────────────────────────────────────────────────────────
+
+function _showAchDetail(charName) {
+  const body  = document.getElementById('achBody');
+  const title = document.getElementById('achTitle');
+  if (!body || !title) return;
+  title.textContent = charName;
+  body.innerHTML = renderAchievementDetailHTML(charName, pfAch.get(charName));
+  openOverlay('achOverlay');
+}
+
+function _closeAchOverlay() { closeOverlay('achOverlay'); }
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
 init();

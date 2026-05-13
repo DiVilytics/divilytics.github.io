@@ -296,7 +296,7 @@ function statBarWidth(r, mode, maxWins, maxGames, maxPct) {
   return Math.round((pct / maxPct) * 100);
 }
 
-// Renders the rank · identity · bar · value · sub stat table. Used by the
+// Renders the rank | identity | bar | value | sub stat table. Used by the
 // leaderboard and the player profile (the character-detail stat table has a
 // different shape and is built inline in characters.js).
 //
@@ -356,6 +356,97 @@ function renderStatTableHTML(rows, opts) {
           </a>`;
       }).join('')}
     </div>`;
+}
+
+// ── ACHIEVEMENTS ──────────────────────────────────────────────────────────────
+
+const ACH_TIERS = [
+  { id: 'bronze', threshold: 1,  label: 'Bronze', icon: '🥉' },
+  { id: 'silver', threshold: 5,  label: 'Silver', icon: '🥈' },
+  { id: 'gold',   threshold: 10, label: 'Gold',   icon: '🥇' },
+];
+const ACH_EMPTY_ICON = '🏆';
+
+function achTierFor(count) {
+  let tier = -1;
+  for (let i = 0; i < ACH_TIERS.length; i++) {
+    if (count >= ACH_TIERS[i].threshold) tier = i;
+  }
+  return tier;
+}
+
+function countAchievements(charAch, allChars) {
+  let earned = 0;
+  for (const c of allChars) {
+    const stats = charAch.get(c.name) || { plays: 0, wins: 0 };
+    const pt = achTierFor(stats.plays);
+    const wt = achTierFor(stats.wins);
+    if (pt >= 0) earned += pt + 1;
+    if (wt >= 0) earned += wt + 1;
+  }
+  return { earned, total: allChars.length * 2 * ACH_TIERS.length };
+}
+
+function computeCharacterAchievements(playerRows) {
+  const out = new Map();
+  for (const p of playerRows) {
+    if (!p.character) continue;
+    const entry = out.get(p.character) || { plays: 0, wins: 0 };
+    entry.plays++;
+    if (p.is_winner) entry.wins++;
+    out.set(p.character, entry);
+  }
+  return out;
+}
+
+function renderAchievementsGridHTML(charAch, allChars, onClickFn = '_showAchDetail') {
+  const topMedal = count => {
+    const t = achTierFor(count);
+    return t >= 0
+      ? `<span class="ach-medal" title="${ACH_TIERS[t].label} (${count})">${ACH_TIERS[t].icon}</span>`
+      : `<span class="ach-medal locked" title="None earned (${count})">${ACH_EMPTY_ICON}</span>`;
+  };
+  const tiles = allChars.map(c => {
+    const stats = charAch.get(c.name) || { plays: 0, wins: 0 };
+    return `
+      <button class="ach-tile" data-char="${_esc(c.name)}" onclick="${onClickFn}(this.dataset.char)" type="button" title="${_esc(c.name)}">
+        <img class="ach-tile-img" src="${charImgSrc(c.name)}" onerror="this.src='asset/player.svg'" alt="${_esc(c.name)}">
+        <div class="ach-tile-rows">
+          <div class="ach-tile-row" aria-label="Plays"><span class="ach-row-icon">🎲:</span>${topMedal(stats.plays)}</div>
+          <div class="ach-tile-row" aria-label="Wins"><span class="ach-row-icon">👑:</span>${topMedal(stats.wins)}</div>
+        </div>
+      </button>`;
+  }).join('');
+  return `
+    <div class="ach-grid">${tiles}</div>`;
+}
+
+function renderAchievementDetailHTML(charName, stats) {
+  stats = stats || { plays: 0, wins: 0 };
+  const track = (count, label, verb) => {
+    const tier = achTierFor(count);
+    return `
+      <div class="ach-track">
+        <div class="ach-track-label">${label} | ${count}</div>
+        ${ACH_TIERS.map((t, i) => {
+          const earned = i <= tier;
+          const cond   = `${verb} ${t.threshold} ${t.threshold === 1 ? 'game' : 'games'}`;
+          const status = earned ? `Earned | ${cond}` : `${count} / ${t.threshold} | ${cond}`;
+          return `<div class="ach-track-tier${earned ? ' earned' : ''}">
+            <span class="ach-track-icon">${t.icon}</span>
+            <span class="ach-track-name">${t.label}</span>
+            <span class="ach-track-status">${status}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+  };
+  return `
+    <div class="ach-detail-head">
+      <img class="char-portrait identity-portrait" src="${charImgSrc(charName)}" onerror="this.src='asset/player.svg'" alt="">
+      <div class="ach-detail-name">${_esc(charName)}</div>
+    </div>
+    ${track(stats.plays, 'Plays', 'Play')}
+    ${track(stats.wins,  'Wins',  'Win')}`;
 }
 
 // ── SEARCH HELPERS ────────────────────────────────────────────────────────────
@@ -484,7 +575,7 @@ function buildGameCardHTML(g, gp, { isSelf = () => false, actions = '', location
     g.num_turns ? `${g.num_turns} turns` : null,
     locationPart,
     `${gp.length}p`,
-  ].filter(Boolean).join(' · ');
+  ].filter(Boolean).join(' | ');
 
   const chipsHTML = gp.map(p => {
     const cls = `chip ${p.is_winner ? 'winner' : ''}${isSelf(p) ? ' self' : ''}`;

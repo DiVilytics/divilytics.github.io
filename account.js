@@ -4,6 +4,7 @@ let _acctNick       = null;
 let _acctFallback   = 'asset/player.svg';
 let _acctBoxInfo    = {};
 let _acctOwnedBoxes = new Set();
+let _acctAch        = new Map();
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
@@ -11,14 +12,16 @@ async function init() {
   await initAuth(() => _onAuthChange());
   const user = getCurrentUser();
   if (!user) { location.href = 'index.html'; return; }
-  const [chars, boxInfo, ownedRes] = await Promise.all([
+  const [chars, boxInfo, ownedRes, gpRes] = await Promise.all([
     loadCharacters(),
     loadBoxInfo(),
     db.from('profile_boxes').select('box').eq('user_id', user.id),
+    db.from('game_players').select('character, is_winner').eq('user_id', user.id),
   ]);
   _acctChars      = chars;
   _acctBoxInfo    = boxInfo;
   _acctOwnedBoxes = new Set((ownedRes.data || []).map(r => r.box));
+  _acctAch        = computeCharacterAchievements(gpRes.data || []);
   _renderPage();
   _renderStatsCard();
 }
@@ -56,18 +59,26 @@ function _renderPage() {
     <div id="acctStats"></div>
 
     <div class="acct-section">
-      <div class="section-label">
-        <span>Player icon</span>
-        <button class="btn btn-ghost btn-sm" id="removeAvatarBtn" onclick="removeAvatar()" ${_acctAvatar ? '' : 'disabled'}>Use default icon</button>
-      </div>
-      <div class="err" id="avatarErr"></div>
-      <div class="avatar-picker" id="avatarPicker"></div>
+      ${(() => {
+        const { earned, total } = countAchievements(_acctAch, _acctChars);
+        return `<div class="section-label">Achievements · ${earned} / ${total}</div>`;
+      })()}
+      ${renderAchievementsGridHTML(_acctAch, _acctChars)}
     </div>
 
     <div class="acct-section">
       <div class="section-label">My boxes</div>
       <div class="err" id="boxesErr"></div>
       <div class="box-picker" id="boxPicker"></div>
+    </div>
+
+    <div class="acct-section">
+      <div class="section-label">
+        <span>Player icon</span>
+        <button class="btn btn-ghost btn-sm" id="removeAvatarBtn" onclick="removeAvatar()" ${_acctAvatar ? '' : 'disabled'}>Use default icon</button>
+      </div>
+      <div class="err" id="avatarErr"></div>
+      <div class="avatar-picker" id="avatarPicker"></div>
     </div>
 
     <div class="acct-section">
@@ -384,6 +395,19 @@ async function confirmDeleteAccount() {
   await db.auth.signOut();
   location.href = 'index.html';
 }
+
+// ── ACHIEVEMENT DETAIL ────────────────────────────────────────────────────────
+
+function _showAchDetail(charName) {
+  const body = document.getElementById('achBody');
+  const title = document.getElementById('achTitle');
+  if (!body || !title) return;
+  title.textContent = charName;
+  body.innerHTML = renderAchievementDetailHTML(charName, _acctAch.get(charName));
+  openOverlay('achOverlay');
+}
+
+function _closeAchOverlay() { closeOverlay('achOverlay'); }
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
 init();

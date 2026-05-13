@@ -34,7 +34,7 @@ async function init() {
 async function load(reset = true) {
 	if (reset) {
 		_gameOffset = 0;
-		// Don't wipe the DOM yet — keep current cards visible while fetching
+		// Don't wipe the DOM yet. keep current cards visible while fetching
 	}
 
 	const charArr  = glFilterChars.size > 0 ? [...glFilterChars] : null;
@@ -179,7 +179,7 @@ function render() {
 
 	const pillArea = document.getElementById('locationPillArea');
 	if (pillArea) pillArea.innerHTML = glFilterLocation
-		? `<button class="pill on" onclick="clearLocationFilter()">${_esc(glFilterLocation)} · Clear</button>`
+		? `<button class="pill on" onclick="clearLocationFilter()">${_esc(glFilterLocation)} | Clear</button>`
 		: '';
 
 	if (_totalGames === 0) {

@@ -80,7 +80,7 @@ function render() {
     fmtDuration(claimGame.duration_minutes),
     claimGame.num_turns ? `${claimGame.num_turns} turns` : null,
     claimGame.location  ? claimGame.location             : null,
-  ].filter(Boolean).join(' · ');
+  ].filter(Boolean).join(' | ');
 
   const rowsHTML = claimPlayers.map(p => {
     const isMine = p.user_id === user.id;

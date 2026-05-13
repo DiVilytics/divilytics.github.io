@@ -1166,6 +1166,92 @@ select:disabled {
 .box-option-year { font-size: 11px; }
 .box-option.selected { color: var(--text); }
 .box-option.selected img { filter: none; opacity: 1; }
+.ach-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+.ach-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0 8px;
+}
+.ach-tile {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--s1);
+  border: 0;
+  border-radius: var(--rs);
+  padding: 4px 8px 4px 4px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+  transition: background 0.15s;
+}
+.ach-tile-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.ach-tile-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ach-tile-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1;
+}
+.ach-row-icon { font-size: 12px; opacity: 0.7; }
+.ach-medal { font-size: 16px; line-height: 1; }
+.ach-medal.locked { filter: grayscale(1); opacity: 0.35; }
+@media (hover: hover) {
+  .ach-tile:hover { background: var(--s2); }
+}
+
+.ach-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.ach-detail-name { font-size: 18px; font-weight: 700; }
+.ach-track {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: var(--rs);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.ach-track-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+.ach-track-tier {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  opacity: 0.5;
+}
+.ach-track-tier.earned { opacity: 1; }
+.ach-track-icon { font-size: 18px; text-align: center; line-height: 1; }
+.ach-track-tier:not(.earned) .ach-track-icon { filter: grayscale(1); }
+.ach-track-name { font-size: 13px; font-weight: 600; }
+.ach-track-status { font-size: 12px; color: var(--muted); }
+
 .box-option.selected::after {
   content: '✓';
   position: absolute;
@@ -1917,16 +2003,17 @@ select:disabled {
 }
 
 .acct-section {
-  padding: 20px 0;
+  padding: 18px 0;
+  border-top: 1px solid var(--border);
 }
 
 .acct-section .section-label {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .acct-actions {

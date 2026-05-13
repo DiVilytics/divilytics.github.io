@@ -362,7 +362,7 @@ function render() {
           : 0;
         const dispVal = b.games
           ? (csMode === 'count' ? b.wins : csMode === 'games' ? b.games : Math.round(pct * 100) + '%')
-          : '—';
+          : '|';
         const secondary = csMode === 'games' ? b.wins : b.games;
         return `
           <div class="lb-row">
