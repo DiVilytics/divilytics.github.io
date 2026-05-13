@@ -244,13 +244,17 @@ function render() {
     })}
 
     ${(() => {
+      const playedChars = pfAllChars.filter(c => {
+        const s = pfAch.get(c.name);
+        return s && (s.plays > 0 || s.wins > 0);
+      });
       const { earned, total } = countAchievements(pfAch, pfAllChars);
       return `
         <div class="pf-games-header">
           <span class="pf-games-title">Achievements · ${earned} / ${total}</span>
-        </div>`;
+        </div>
+        ${renderAchievementsGridHTML(pfAch, playedChars)}`;
     })()}
-    ${renderAchievementsGridHTML(pfAch, pfAllChars)}
 
     <div class="pf-games-header">
       <span class="pf-games-title">Games</span>

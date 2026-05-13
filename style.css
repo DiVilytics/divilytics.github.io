@@ -1208,7 +1208,7 @@ select:disabled {
 .ach-tile-rows {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 8px;
 }
 .ach-tile-row {
   display: flex;
@@ -1232,6 +1232,28 @@ select:disabled {
 .ach-row-icon { font-size: 12px; opacity: 0.7; }
 .ach-medal { font-size: 16px; line-height: 1; }
 .ach-medal.locked { filter: grayscale(1); opacity: 0.35; }
+/* Cup tier tints — recolor the 🏆 emoji per tier via filters.
+   The trick: grayscale flattens the emoji, then sepia + hue-rotate
+   tints it toward bronze/silver/gold. */
+.ach-cup.ach-cup-bronze {
+  filter: grayscale(1) sepia(1) saturate(2.2) hue-rotate(-20deg) brightness(0.85);
+}
+.ach-cup.ach-cup-silver {
+  filter: grayscale(1) brightness(1.15) contrast(0.9);
+}
+.ach-cup.ach-cup-gold {
+  filter: grayscale(1) sepia(1) saturate(3) hue-rotate(5deg) brightness(1.05);
+}
+/* Star tier tints — same recipe as the cups so plays/wins share an aura. */
+.ach-star.ach-star-bronze {
+  filter: grayscale(1) sepia(1) saturate(2.2) hue-rotate(-20deg) brightness(0.85);
+}
+.ach-star.ach-star-silver {
+  filter: grayscale(1) brightness(1.15) contrast(0.9);
+}
+.ach-star.ach-star-gold {
+  filter: grayscale(1) sepia(1) saturate(3) hue-rotate(5deg) brightness(1.05);
+}
 @media (hover: hover) {
   .ach-tile:hover { background: var(--s2); }
 }

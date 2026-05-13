@@ -361,11 +361,12 @@ function renderStatTableHTML(rows, opts) {
 // ── ACHIEVEMENTS ──────────────────────────────────────────────────────────────
 
 const ACH_TIERS = [
-  { id: 'bronze', threshold: 1,  label: 'Bronze', icon: '🥉' },
-  { id: 'silver', threshold: 5,  label: 'Silver', icon: '🥈' },
-  { id: 'gold',   threshold: 10, label: 'Gold',   icon: '🥇' },
+  { id: 'bronze', threshold: 1,  label: 'Bronze', icon: '⭐', cupIcon: '🏆' },
+  { id: 'silver', threshold: 5,  label: 'Silver', icon: '⭐', cupIcon: '🏆' },
+  { id: 'gold',   threshold: 10, label: 'Gold',   icon: '⭐', cupIcon: '🏆' },
 ];
 const ACH_EMPTY_ICON = '🏆';
+const ACH_EMPTY_MEDAL_ICON = '⭐';
 
 function achTierFor(count) {
   let tier = -1;
@@ -400,11 +401,19 @@ function computeCharacterAchievements(playerRows) {
 }
 
 function renderAchievementsGridHTML(charAch, allChars, onClickFn = '_showAchDetail') {
-  const topMedal = count => {
+  const topMedal = (count, kind) => {
     const t = achTierFor(count);
-    return t >= 0
-      ? `<span class="ach-medal" title="${ACH_TIERS[t].label} (${count})">${ACH_TIERS[t].icon}</span>`
-      : `<span class="ach-medal locked" title="None earned (${count})">${ACH_EMPTY_ICON}</span>`;
+    const isCup = kind === 'cup';
+    const emptyIcon = isCup ? ACH_EMPTY_ICON : ACH_EMPTY_MEDAL_ICON;
+    if (t < 0) {
+      return `<span class="ach-medal locked" title="None earned (${count})">${emptyIcon}</span>`;
+    }
+    const tier = ACH_TIERS[t];
+    const icon = isCup ? tier.cupIcon : tier.icon;
+    const tierCls = isCup
+      ? ` ach-cup ach-cup-${tier.id}`
+      : ` ach-star ach-star-${tier.id}`;
+    return `<span class="ach-medal${tierCls}" title="${tier.label} (${count})">${icon}</span>`;
   };
   const tiles = allChars.map(c => {
     const stats = charAch.get(c.name) || { plays: 0, wins: 0 };
@@ -413,8 +422,8 @@ function renderAchievementsGridHTML(charAch, allChars, onClickFn = '_showAchDeta
         <div class="ach-tile-main">
           <img class="ach-tile-img" src="${charImgSrc(c.name)}" onerror="this.src='asset/player.svg'" alt="${_esc(c.name)}">
           <div class="ach-tile-rows">
-            <div class="ach-tile-row" aria-label="Plays"><span class="ach-row-icon">🎲:</span>${topMedal(stats.plays)}</div>
-            <div class="ach-tile-row" aria-label="Wins"><span class="ach-row-icon">👑:</span>${topMedal(stats.wins)}</div>
+            <div class="ach-tile-row" aria-label="Plays">${topMedal(stats.plays, 'medal')}</div>
+            <div class="ach-tile-row" aria-label="Wins">${topMedal(stats.wins, 'cup')}</div>
           </div>
         </div>
         <div class="ach-tile-name">${_esc(c.name)}</div>
@@ -426,8 +435,9 @@ function renderAchievementsGridHTML(charAch, allChars, onClickFn = '_showAchDeta
 
 function renderAchievementDetailHTML(charName, stats) {
   stats = stats || { plays: 0, wins: 0 };
-  const track = (count, label, verb) => {
+  const track = (count, label, verb, kind) => {
     const tier = achTierFor(count);
+    const isCup = kind === 'cup';
     return `
       <div class="ach-track">
         <div class="ach-track-label">${label} | ${count}</div>
@@ -435,8 +445,12 @@ function renderAchievementDetailHTML(charName, stats) {
           const earned = i <= tier;
           const cond   = `${verb} ${t.threshold} ${t.threshold === 1 ? 'game' : 'games'}`;
           const status = earned ? `Earned | ${cond}` : `${count} / ${t.threshold} | ${cond}`;
+          const icon   = isCup ? t.cupIcon : t.icon;
+          const tierCls = isCup
+            ? ` ach-cup ach-cup-${t.id}`
+            : ` ach-star ach-star-${t.id}`;
           return `<div class="ach-track-tier${earned ? ' earned' : ''}">
-            <span class="ach-track-icon">${t.icon}</span>
+            <span class="ach-track-icon${tierCls}">${icon}</span>
             <span class="ach-track-name">${t.label}</span>
             <span class="ach-track-status">${status}</span>
           </div>`;
@@ -448,8 +462,8 @@ function renderAchievementDetailHTML(charName, stats) {
       <img class="char-portrait identity-portrait" src="${charImgSrc(charName)}" onerror="this.src='asset/player.svg'" alt="">
       <div class="ach-detail-name">${_esc(charName)}</div>
     </div>
-    ${track(stats.plays, 'Plays', 'Play')}
-    ${track(stats.wins,  'Wins',  'Win')}`;
+    ${track(stats.plays, 'Plays', 'Play', 'medal')}
+    ${track(stats.wins,  'Wins',  'Win',  'cup')}`;
 }
 
 // ── SEARCH HELPERS ────────────────────────────────────────────────────────────
