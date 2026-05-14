@@ -589,7 +589,7 @@ function buildGameCardHTML(g, gp, { isSelf = () => false, actions = '', location
     : null;
   const meta = [
     fmtDuration(g.duration_minutes),
-    g.num_turns ? `${g.num_turns} turns` : null,
+    g.num_turns ? `${g.num_turns} rounds` : null,
     locationPart,
     `${gp.length}p`,
   ].filter(Boolean).join(' | ');

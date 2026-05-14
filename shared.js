@@ -114,6 +114,7 @@ window.addEventListener('storage', e => {
 
 let _currentUser    = null;
 let _currentProfile = null;
+let _profileLoadFailed = false;  // true when the last fetch errored (likely offline) — don't prompt for nickname
 let _authChangeHook = null;
 
 async function initAuth(onChange) {
@@ -138,7 +139,7 @@ async function initAuth(onChange) {
 
     _updateAuthUI();
 
-    if (event === 'SIGNED_IN' && _currentUser && !_currentProfile) {
+    if (event === 'SIGNED_IN' && _currentUser && !_currentProfile && !_profileLoadFailed) {
       _openNicknameModal();
     }
 
@@ -148,8 +149,10 @@ async function initAuth(onChange) {
   _updateAuthUI();
 
   // Force nickname setup if logged in but no profile yet
-  // (e.g. user closed the tab before finishing setup and came back)
-  if (_currentUser && !_currentProfile) {
+  // (e.g. user closed the tab before finishing setup and came back).
+  // Skip when the profile fetch errored — likely offline with a cached page,
+  // and we can't tell whether a profile actually exists.
+  if (_currentUser && !_currentProfile && !_profileLoadFailed) {
     _openNicknameModal();
   }
 
@@ -158,7 +161,19 @@ async function initAuth(onChange) {
 
 async function _loadProfile() {
   if (!_currentUser) return null;
-  _currentProfile = await fetchProfile({ id: _currentUser.id });
+  const { data, error } = await db
+    .from('profiles')
+    .select('*')
+    .eq('id', _currentUser.id)
+    .maybeSingle();
+  if (error) {
+    console.warn('_loadProfile error:', error);
+    _profileLoadFailed = true;
+    _currentProfile = null;
+  } else {
+    _profileLoadFailed = false;
+    _currentProfile = data || null;
+  }
   return _currentProfile;
 }
 

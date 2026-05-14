@@ -1361,7 +1361,12 @@ select:disabled {
   flex-shrink: 0;
   gap: 6px;
 }
-.draw-mode-row > .exclude-toggle.exclude-toggle-inline:first-of-type { margin-left: auto; }
+.draw-mode-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
 .exclude-toggle.exclude-toggle-inline .toggle-right { gap: 6px; }
 .owned-toggle.on {
   background: var(--accent-d);
@@ -2104,17 +2109,30 @@ select:disabled {
    Lives at the end of the file so each rule wins the cascade against its
    unconditional counterpart, regardless of where in the file that lives.
    ────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .draw-mode-row                  { gap: 6px; }
+  .draw-mode-row .pace-colors     { gap: 3px; }
+  .draw-mode-row .pace-color      { width: 20px; height: 20px; border-width: 1px; }
+  .draw-mode-row .pace-color.on   { box-shadow: 0 0 0 1px var(--bg), 0 0 0 3px currentColor; }
+  .draw-mode-row .draw-mode-select { padding-right: 22px; }
+  .draw-mode-row .draw-mode-actions { gap: 6px; }
+}
+
 @media (max-width: 480px) {
   .home-steps    { grid-template-columns: 1fr; }
   .home-faq-list { grid-template-columns: 1fr; }
   .lb-head, .lb-row                     { grid-template-columns: 24px 1fr 52px 52px 44px; }
   .cs-table .lb-head, .cs-table .lb-row { grid-template-columns: 68px 1fr 56px 44px; }
   .form-row input { font-size: 13px; }
-  .draw-mode-row                  { gap: 6px; }
-  .draw-mode-row .pace-color     { width: 24px; height: 24px; }
-  .draw-mode-row .draw-mode-select { padding-right: 22px; }
+  .draw-mode-row .pace-color      { width: 18px; height: 18px; }
 }
 
 @media (max-width: 360px) {
   .nav-links a { padding: 5px 8px; font-size: 12px; }
+  .draw-mode-row                  { gap: 4px; }
+  .draw-mode-row .pace-colors     { gap: 2px; }
+  .draw-mode-row .pace-color      { width: 14px; height: 14px; }
+  .draw-mode-row .draw-mode-actions { gap: 4px; }
+  .draw-mode-row .draw-mode-select,
+  .draw-mode-row .exclude-toggle.exclude-toggle-inline { padding: 5px 6px; font-size: 11px; }
 }

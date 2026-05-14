@@ -78,7 +78,7 @@ function render() {
 
   const meta = [
     fmtDuration(claimGame.duration_minutes),
-    claimGame.num_turns ? `${claimGame.num_turns} turns` : null,
+    claimGame.num_turns ? `${claimGame.num_turns} rounds` : null,
     claimGame.location  ? claimGame.location             : null,
   ].filter(Boolean).join(' | ');
 

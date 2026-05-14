@@ -56,10 +56,10 @@
     <div class="live-time" id="liveTime">00:00</div>
     <div class="live-turns">
       <button class="live-btn" type="button" onclick="bumpTurn(-1)">−</button>
-      <div class="live-turn-count"><span id="liveTurnCount">0</span><span class="live-turn-lbl">turns</span></div>
+      <div class="live-turn-count"><span id="liveTurnCount">0</span><span class="live-turn-lbl">rounds</span></div>
       <button class="live-btn" type="button" onclick="bumpTurn(1)">+</button>
     </div>
-    <p class="live-hint">Tap + each turn. When you're done, press Pause Game. The duration and the number of turns will be filled in.</p>
+    <p class="live-hint">Tap + each round. When you're done, press Pause Game. The duration and the number of rounds will be filled in.</p>
   </div>
 
   <!-- FORM CONTENT — hidden while a live game is running -->
@@ -80,7 +80,7 @@
         <input type="number" id="fDur" min="1" max="999" placeholder="optional">
       </div>
       <div class="field">
-        <label>Turns <span class="optional"></span></label>
+        <label>Rounds <span class="optional"></span></label>
         <input type="number" id="fTurns" min="1" max="999" placeholder="optional">
       </div>
     </div>
@@ -104,16 +104,18 @@
         <button class="pace-color orange" data-pace="orange" onclick="setPaceColor('orange')" type="button" title="Orange"></button>
         <button class="pace-color red"    data-pace="red"    onclick="setPaceColor('red')"    type="button" title="Red"></button>
       </div>
-      <button class="exclude-toggle exclude-toggle-inline owned-toggle" id="ownedOnlyBtn" type="button" onclick="toggleOwnedOnly()">
-        <span class="exclude-toggle-label">Mine</span>
-      </button>
-      <button class="exclude-toggle exclude-toggle-inline" type="button" onclick="toggleExclude()">
-        <span class="exclude-toggle-label">Exclude</span>
-        <div class="toggle-right">
-          <span class="badge" id="exBadge"></span>
-          <span class="chevron" id="exChevron">▼</span>
-        </div>
-      </button>
+      <div class="draw-mode-actions">
+        <button class="exclude-toggle exclude-toggle-inline owned-toggle" id="ownedOnlyBtn" type="button" onclick="toggleOwnedOnly()">
+          <span class="exclude-toggle-label">Mine</span>
+        </button>
+        <button class="exclude-toggle exclude-toggle-inline" type="button" onclick="toggleExclude()">
+          <span class="exclude-toggle-label">Exclude</span>
+          <div class="toggle-right">
+            <span class="badge" id="exBadge"></span>
+            <span class="chevron" id="exChevron">▼</span>
+          </div>
+        </button>
+      </div>
     </div>
     <div class="exclude-body" id="excludeBody">
       <div class="exclude-locked-hint hidden" id="excludeLockedHint">Filter is controlled by pace mode</div>
