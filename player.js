@@ -73,7 +73,7 @@ async function init() {
     document.getElementById('pfControls').insertAdjacentElement('beforebegin', identityEl);
   }
   identityEl.innerHTML =
-    `<span class="pf-identity"><img id="pfAvatar" class="player-avatar-lg" src="${_esc(pfAvatarUrl)}" alt="" onerror="this.src='asset/player.svg'">${nameBlock}</span>`;
+    `<span class="pf-identity"><img id="pfAvatar" class="player-avatar-lg zoomable" src="${_esc(pfAvatarUrl)}" alt="" onerror="this.src='asset/player.svg'" onclick="showAvatarLightbox(this.src, 'asset/player.svg')">${nameBlock}</span>`;
 
   await load();
 }

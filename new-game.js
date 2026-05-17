@@ -707,7 +707,7 @@ function _doResume() {
 
   if (_resumeTickId) { clearInterval(_resumeTickId); _resumeTickId = null; }
   document.getElementById('resumeBanner')?.remove();
-  if (!getCurrentUser()) { signInWithDiscord(); return; }
+  if (!getCurrentUser()) { goToSignIn(); return; }
   if (!getCurrentProfile()) { _openNicknameModal(); return; }
 
   const sbR = document.getElementById('startBtn');

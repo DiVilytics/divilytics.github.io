@@ -191,6 +191,23 @@ async function signInWithDiscord() {
   });
 }
 
+async function signInWithGoogle() {
+  for (const fn of _preSignInHooks) { try { fn(); } catch (_) {} }
+  await db.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.href },
+  });
+}
+
+// Navigate to the dedicated sign-in page, remembering where to return after
+// the OAuth round-trip. Used everywhere we used to call signInWithDiscord()
+// directly from a UI affordance.
+function goToSignIn() {
+  for (const fn of _preSignInHooks) { try { fn(); } catch (_) {} }
+  const returnTo = encodeURIComponent(window.location.href);
+  window.location.href = `signin.html?returnTo=${returnTo}`;
+}
+
 async function signOut() {
   await db.auth.signOut();
   _currentUser    = null;
@@ -209,7 +226,7 @@ function _updateAuthUI() {
     const avatarSrc = resolveAvatar(_currentProfile);
     el.innerHTML = `${themeBtn}<a class="nav-avatar-link active" href="account.html" title="Account"><img class="nav-avatar" src="${_esc(avatarSrc)}" onerror="this.src='asset/player.svg'" alt=""></a>`;
   } else {
-    el.innerHTML = `${themeBtn}<button class="nav-avatar-btn" onclick="signInWithDiscord()" title="Sign in"><img class="nav-avatar nav-avatar-guest" src="asset/player.svg" alt=""></button>`;
+    el.innerHTML = `${themeBtn}<button class="nav-avatar-btn" onclick="goToSignIn()" title="Sign in"><img class="nav-avatar nav-avatar-guest" src="asset/player.svg" alt=""></button>`;
   }
   _updateThemeBtn();
   _updateThemeIcons();

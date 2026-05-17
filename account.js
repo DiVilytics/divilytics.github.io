@@ -5,6 +5,13 @@ let _acctFallback   = 'asset/player.svg';
 let _acctBoxInfo    = {};
 let _acctOwnedBoxes = new Set();
 let _acctAch        = new Map();
+let _acctIdentities = [];   // list of { provider, identity_id, email, last_sign_in_at, ... }
+
+// Providers we support, in display order. Keep in sync with signin.html.
+const ACCT_PROVIDERS = [
+  { key: 'discord', label: 'Discord', logo: 'asset/signin/discord.png' },
+  { key: 'google',  label: 'Google',  logo: 'asset/signin/google.png'  },
+];
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
@@ -22,8 +29,20 @@ async function init() {
   _acctBoxInfo    = boxInfo;
   _acctOwnedBoxes = new Set((ownedRes.data || []).map(r => r.box));
   _acctAch        = computeCharacterAchievements(gpRes.data || []);
+  await _loadIdentities();
   _renderPage();
   _renderStatsCard();
+}
+
+async function _loadIdentities() {
+  try {
+    const { data, error } = await db.auth.getUserIdentities();
+    if (error) { console.warn('getUserIdentities error:', error); _acctIdentities = []; return; }
+    _acctIdentities = data?.identities || [];
+  } catch (e) {
+    console.warn('getUserIdentities threw:', e);
+    _acctIdentities = [];
+  }
 }
 
 function _onAuthChange() {
@@ -40,16 +59,17 @@ function _renderPage() {
   _acctFallback = profile?.default_avatar || 'asset/player.svg';
 
   const since   = profile?.created_at ? `Since ${fmtDateShort(profile.created_at)}` : null;
-  const email   = user?.email ? `Discord: ${user.email}` : null;
+  const email   = user?.email ? user.email : null;
   const metaLn  = [since, email].filter(Boolean).join(' | ');
 
   const root = document.getElementById('acctRoot');
   root.className = '';
   root.innerHTML = `
     <div class="acct-identity">
-      <img class="player-avatar-lg" id="acctAvatarPreview"
+      <img class="player-avatar-lg zoomable" id="acctAvatarPreview"
         src="${_esc(_acctAvatar || _acctFallback)}"
-        onerror="this.src='${_esc(_acctFallback)}'" alt="">
+        onerror="this.src='${_esc(_acctFallback)}'"
+        onclick="showAvatarLightbox(this.src, '${_esc(_acctFallback)}')" alt="">
       <div>
         <div class="acct-nick">${_esc(_acctNick || '|')}</div>
         ${metaLn ? `<div class="pf-since">${_esc(metaLn)}</div>` : ''}
@@ -83,6 +103,8 @@ function _renderPage() {
 
     <div class="acct-section">
       <div class="section-label">Account</div>
+      <div class="err" id="identitiesErr"></div>
+      <div id="identitiesList" class="acct-identities">${_renderIdentitiesHTML()}</div>
       <div class="acct-actions">
         <button class="btn btn-ghost" onclick="changeNickname()">Change nickname</button>
         <button class="btn btn-ghost" id="exportDataBtn" onclick="exportMyData()">Download my data</button>
@@ -408,6 +430,75 @@ function _showAchDetail(charName) {
 }
 
 function _closeAchOverlay() { closeOverlay('achOverlay'); }
+
+// ── LINKED IDENTITIES ─────────────────────────────────────────────────────────
+
+function _renderIdentitiesHTML() {
+  const linkedSet = new Set(_acctIdentities.map(i => i.provider));
+  const canUnlink = linkedSet.size > 1;  // refuse to remove the last identity
+
+  return ACCT_PROVIDERS.map(p => {
+    const identity = _acctIdentities.find(i => i.provider === p.key);
+    const isLinked = !!identity;
+    const meta     = identity?.identity_data?.email || identity?.email || '';
+
+    let actionHTML;
+    if (isLinked) {
+      actionHTML = `
+        <span class="identity-linked-badge">Linked</span>
+        <button class="btn btn-ghost btn-sm" ${canUnlink ? '' : 'disabled'} title="${canUnlink ? 'Unlink this provider' : 'You need at least one sign-in method'}"
+                onclick="unlinkIdentity('${_esc(p.key)}')">Unlink</button>
+      `;
+    } else {
+      actionHTML = `<button class="btn btn-primary btn-sm" onclick="linkIdentity('${_esc(p.key)}')">Link</button>`;
+    }
+
+    return `
+      <div class="identity-row">
+        <img class="identity-logo" src="${_esc(p.logo)}" alt="">
+        <div class="identity-text">
+          <div class="identity-name">${_esc(p.label)}</div>
+          ${meta ? `<div class="identity-meta">${_esc(meta)}</div>` : ''}
+        </div>
+        <div class="identity-actions">${actionHTML}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function linkIdentity(provider) {
+  clearError('identitiesErr');
+  const { error } = await db.auth.linkIdentity({
+    provider,
+    options: { redirectTo: window.location.href },
+  });
+  if (error) {
+    // Common case: "Manual linking is not enabled" or provider not configured.
+    showError('identitiesErr', error.message);
+  }
+}
+
+async function unlinkIdentity(provider) {
+  clearError('identitiesErr');
+  const identity = _acctIdentities.find(i => i.provider === provider);
+  if (!identity) return;
+
+  // Safety: never unlink the last identity (would leave the user stranded).
+  if (_acctIdentities.length <= 1) {
+    showError('identitiesErr', 'You need at least one sign-in method.');
+    return;
+  }
+
+  const { error } = await db.auth.unlinkIdentity(identity);
+  if (error) {
+    showError('identitiesErr', error.message);
+    return;
+  }
+
+  await _loadIdentities();
+  const host = document.getElementById('identitiesList');
+  if (host) host.innerHTML = _renderIdentitiesHTML();
+}
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
 init();

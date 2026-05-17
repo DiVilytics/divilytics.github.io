@@ -231,6 +231,37 @@ function openOverlay(id) {
   document.body.style.overflow = 'hidden';
 }
 
+// Avatar zoom: full-screen circular preview of an image. Click anywhere
+// outside the image (or on the close button) to dismiss. The overlay is
+// injected once per page on first use.
+function showAvatarLightbox(src, fallback) {
+  let overlay = document.getElementById('avatarLightbox');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'avatarLightbox';
+    overlay.className = 'avatar-lightbox';
+    // Any click anywhere on the overlay (image, backdrop, close button) dismisses.
+    overlay.onclick = () => closeAvatarLightbox();
+    overlay.innerHTML = `
+      <button class="avatar-lightbox-close" type="button" aria-label="Close">×</button>
+      <img class="avatar-lightbox-img" id="avatarLightboxImg" alt="">
+    `;
+    document.body.appendChild(overlay);
+  }
+  const img = document.getElementById('avatarLightboxImg');
+  img.src = src;
+  if (fallback) img.onerror = () => { img.src = fallback; };
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeAvatarLightbox() {
+  const overlay = document.getElementById('avatarLightbox');
+  if (!overlay) return;
+  overlay.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
 function showQRModal(url, codeElId, overlayId) {
   document.getElementById('qrUrlText').textContent = url;
   const el = document.getElementById(codeElId);
@@ -365,8 +396,19 @@ const ACH_TIERS = [
   { id: 'silver', threshold: 5,  label: 'Silver', icon: '⭐', cupIcon: '🏆' },
   { id: 'gold',   threshold: 10, label: 'Gold',   icon: '⭐', cupIcon: '🏆' },
 ];
-const ACH_EMPTY_ICON = '🏆';
-const ACH_EMPTY_MEDAL_ICON = '⭐';
+// Locked / not-yet-earned slots render as a subtle dot rather than a greyed
+// trophy/star, so they read as "empty" instead of "dim silver".
+const ACH_EMPTY_ICON       = '·';
+const ACH_EMPTY_MEDAL_ICON = '·';
+
+// Long character names that read better as two lines in the cramped achievement
+// tile label. Returns HTML; callers must NOT pre-escape — this helper escapes
+// each part itself.
+function _fmtAchTileName(name) {
+  if (name === 'Cruella de Vil')  return 'Cruella<br>de Vil';
+  if (name === 'Queen of Hearts') return 'Queen<br>of Hearts';
+  return _esc(name);
+}
 
 function achTierFor(count) {
   let tier = -1;
@@ -426,7 +468,7 @@ function renderAchievementsGridHTML(charAch, allChars, onClickFn = '_showAchDeta
             <div class="ach-tile-row" aria-label="Wins">${topMedal(stats.wins, 'cup')}</div>
           </div>
         </div>
-        <div class="ach-tile-name">${_esc(c.name)}</div>
+        <div class="ach-tile-name">${_fmtAchTileName(c.name)}</div>
       </button>`;
   }).join('');
   return `

@@ -268,7 +268,7 @@ async function _renderCharIdentity() {
   const objective  = objectives[csChar.name];
   const paceDot    = csChar.pace ? `<span class="pace-dot ${csChar.pace}" title="${_esc(csChar.pace)}"></span>` : '';
   document.getElementById('csIdentity').innerHTML =
-    `<div class="pf-identity"><img class="char-portrait identity-portrait" src="${charImgSrc(csChar.name)}" alt=""><span class="pf-name-block"><span class="pf-nick">${_esc(csChar.name)}</span><span class="pf-since">${_esc(csChar.box)}</span></span></div>${objective ? `<p class="char-objective">${paceDot}${_esc(objective)}</p>` : ''}`;
+    `<div class="pf-identity"><img class="char-portrait identity-portrait zoomable" src="${charImgSrc(csChar.name)}" alt="" onerror="this.src='asset/player.svg'" onclick="showAvatarLightbox(this.src, 'asset/player.svg')"><span class="pf-name-block"><span class="pf-nick">${_esc(csChar.name)}</span><span class="pf-since">${_esc(csChar.box)}</span></span></div>${objective ? `<p class="char-objective">${paceDot}${_esc(objective)}</p>` : ''}`;
 }
 
 function _foldBuckets(buckets) {

@@ -89,8 +89,10 @@
 /* Page header that aligns its right-side controls to the top instead of center. */
 .page-header.align-top { align-items: flex-start; }
 
-/* Char detail-page identity portrait (40px). */
-.identity-portrait { width: 40px; height: 40px; flex-shrink: 0; }
+/* Char detail-page identity portrait (40px). Compound selector wins against
+   the later `.char-portrait` rule (18px) when both classes are applied. */
+.identity-portrait,
+.char-portrait.identity-portrait { width: 40px; height: 40px; flex-shrink: 0; }
 
 /* Tight spinner for inline reloads. */
 .spinner-inline { padding: 1rem 0; }
@@ -1113,6 +1115,52 @@ select:disabled {
   object-fit: cover;
   flex-shrink: 0;
 }
+.zoomable { cursor: zoom-in; }
+
+/* ── AVATAR ZOOM LIGHTBOX ─────────────────────────────────────────── */
+.avatar-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 24px;
+  cursor: zoom-out;
+}
+.avatar-lightbox.open { display: flex; }
+.avatar-lightbox-img {
+  max-width: min(420px, 80vw);
+  max-height: min(420px, 80vh);
+  width: auto;
+  height: auto;
+  border-radius: 50%;
+  object-fit: cover;
+  aspect-ratio: 1 / 1;
+  background: var(--s1);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  cursor: zoom-out;
+}
+.avatar-lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.avatar-lightbox-close:hover { background: rgba(255, 255, 255, 0.22); }
 .avatar-picker {
   display: flex;
   flex-wrap: wrap;
@@ -1230,16 +1278,46 @@ select:disabled {
   overflow: hidden;
 }
 .ach-row-icon { font-size: 12px; opacity: 0.7; }
-.ach-medal { font-size: 16px; line-height: 1; }
-.ach-medal.locked { filter: grayscale(1); opacity: 0.35; }
+.ach-medal {
+  /* Fixed horizontal footprint so star/cup emojis line up vertically with
+     the dot used for locked slots (which is much narrower as a glyph). */
+  display: inline-block;
+  width: 1.4em;
+  text-align: center;
+  font-size: 16px;
+  line-height: 1;
+  transition: opacity 0.15s;
+}
+/* Locked = empty slot. Renders as a CSS-drawn dot centered both axes within
+   the medal's fixed slot (text-character dots sit on the baseline, which
+   doesn't line up with the emoji glyphs). The text content from
+   ACH_EMPTY_ICON/ACH_EMPTY_MEDAL_ICON in ui.js is hidden via transparency. */
+.ach-medal.locked {
+  position: relative;
+  color: transparent;
+  filter: none;
+}
+.ach-medal.locked::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.28em;
+  height: 0.28em;
+  border-radius: 50%;
+  background: var(--muted);
+  opacity: 0.55;
+  transform: translate(-50%, -50%);
+}
 /* Cup tier tints — recolor the 🏆 emoji per tier via filters.
    The trick: grayscale flattens the emoji, then sepia + hue-rotate
-   tints it toward bronze/silver/gold. */
+   tints it toward bronze/silver/gold. Silver keeps a slight cool tint so
+   it doesn't blend into the neutral-grey locked state. */
 .ach-cup.ach-cup-bronze {
   filter: grayscale(1) sepia(1) saturate(2.2) hue-rotate(-20deg) brightness(0.85);
 }
 .ach-cup.ach-cup-silver {
-  filter: grayscale(1) brightness(1.15) contrast(0.9);
+  filter: grayscale(0.85) saturate(0.7) hue-rotate(180deg) brightness(1.3) contrast(0.9);
 }
 .ach-cup.ach-cup-gold {
   filter: grayscale(1) sepia(1) saturate(3) hue-rotate(5deg) brightness(1.05);
@@ -1249,7 +1327,7 @@ select:disabled {
   filter: grayscale(1) sepia(1) saturate(2.2) hue-rotate(-20deg) brightness(0.85);
 }
 .ach-star.ach-star-silver {
-  filter: grayscale(1) brightness(1.15) contrast(0.9);
+  filter: grayscale(0.85) saturate(0.7) hue-rotate(180deg) brightness(1.3) contrast(0.9);
 }
 .ach-star.ach-star-gold {
   filter: grayscale(1) sepia(1) saturate(3) hue-rotate(5deg) brightness(1.05);
@@ -2069,6 +2147,115 @@ select:disabled {
   gap: 8px;
 }
 
+/* ── SIGN-IN PAGE ─────────────────────────────────────────────────── */
+.signin-card {
+  max-width: 420px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.signin-intro {
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0;
+}
+.signin-hint {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+  margin: 0;
+}
+.signin-hint strong { color: var(--text); margin-right: 4px; }
+.signin-providers {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+.signin-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  background: var(--s1);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.08s;
+}
+.signin-btn:active { transform: translateY(1px); }
+.signin-btn-logo {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+/* ── ACCOUNT: LINKED PROVIDERS ────────────────────────────────────── */
+.acct-identities { margin-bottom: 12px; }
+.identity-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--s1);
+}
+.identity-row + .identity-row { margin-top: 8px; }
+.identity-logo {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.identity-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.identity-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.identity-meta {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.identity-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.identity-linked-badge {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  background: var(--accent-d);
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
 /* ── HOVER STATES (pointer devices only) ─────────────────────────── */
 @media (hover: hover) {
   .nav-links a:hover                        { color: var(--text); background: var(--s2); }
@@ -2088,6 +2275,7 @@ select:disabled {
   .btn-danger:hover                         { background: var(--red-d); border-color: rgba(224, 84, 84, 0.45); }
   .btn-success:hover                        { background: rgba(74, 222, 128, 0.1); border-color: rgba(74, 222, 128, 0.55); color: #86efac; }
   .btn-load-more:hover                      { background: var(--s2); color: var(--text); }
+  .signin-btn:hover                         { background: var(--s2); border-color: var(--s4); }
   .pill:hover                               { color: var(--text); border-color: var(--s4); }
   .filter-char-toggle:hover                 { background: var(--s2); color: var(--text); }
   .exclude-toggle:hover                     { background: var(--s2); color: var(--text); }
@@ -2125,6 +2313,9 @@ select:disabled {
   .cs-table .lb-head, .cs-table .lb-row { grid-template-columns: 68px 1fr 56px 44px; }
   .form-row input { font-size: 13px; }
   .draw-mode-row .pace-color      { width: 18px; height: 18px; }
+  /* Tighter box picker: lets 3 columns fit instead of 2, keeping cover art
+     a comfortable size on phones. */
+  .box-picker { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
 }
 
 @media (max-width: 360px) {
@@ -2135,4 +2326,5 @@ select:disabled {
   .draw-mode-row .draw-mode-actions { gap: 4px; }
   .draw-mode-row .draw-mode-select,
   .draw-mode-row .exclude-toggle.exclude-toggle-inline { padding: 5px 6px; font-size: 11px; }
+  .box-picker { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
 }

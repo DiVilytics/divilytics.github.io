@@ -58,7 +58,7 @@ function render() {
         <div class="empty-icon">🔒</div>
         <h3>Sign in to claim</h3>
         <p>You need to be signed in to claim your character.</p>
-        <button class="btn btn-primary" onclick="signInWithDiscord()">Sign in with Discord</button>
+        <button class="btn btn-primary" onclick="goToSignIn()">Sign in</button>
       </div>`;
     return;
   }
