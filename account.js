@@ -7,7 +7,7 @@ let _acctOwnedBoxes = new Set();
 let _acctAch        = new Map();
 let _acctIdentities = [];   // list of { provider, identity_id, email, last_sign_in_at, ... }
 
-// Providers we support, in display order. Keep in sync with signin.html.
+// Providers we support, in display order. Keep in sync with sign-in.html.
 const ACCT_PROVIDERS = [
   { key: 'discord', label: 'Discord', logo: 'asset/signin/discord.png' },
   { key: 'google',  label: 'Google',  logo: 'asset/signin/google.png'  },

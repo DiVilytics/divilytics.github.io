@@ -205,7 +205,7 @@ async function signInWithGoogle() {
 function goToSignIn() {
   for (const fn of _preSignInHooks) { try { fn(); } catch (_) {} }
   const returnTo = encodeURIComponent(window.location.href);
-  window.location.href = `signin.html?returnTo=${returnTo}`;
+  window.location.href = `sign-in.html?returnTo=${returnTo}`;
 }
 
 async function signOut() {
