@@ -45,8 +45,8 @@ function _audioStop() {
 function _updateMediaMetadata() {
 	if (!_mediaReady || !('mediaSession' in navigator)) return;
 	const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-	const icon = dark ? 'asset/logo-b.png' : 'asset/logo-w.png';
-	// const icon = new URL(dark ? 'asset/logo-b.png' : 'asset/logo-w.png', location.href).href;  // not working for some reason!
+	const icon = dark ? 'asset/logos/logo-b.png' : 'asset/logos/logo-w.png';
+	// const icon = new URL(dark ? 'asset/logos/logo-b.png' : 'asset/logos/logo-w.png', location.href).href;  // not working for some reason!
 	const location = document.getElementById('fLocation')?.value.trim();
 	navigator.mediaSession.metadata = new MediaMetadata({
 		title:  `Round ${liveGame.turns}`,

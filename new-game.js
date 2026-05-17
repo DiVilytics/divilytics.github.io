@@ -396,14 +396,14 @@ function renderOrderSlots() {
   container.innerHTML = orderSlots.map((s, i) => {
     const taken     = new Set(orderSlots.filter(o => o.id !== s.id && o.char).map(o => o.char));
     const available = chars.filter(c => !taken.has(c.name));
-    const src       = s.char ? charImgSrc(s.char) : 'asset/player.svg';
+    const src       = s.char ? charImgSrc(s.char) : 'asset/players/default.svg';
     const nameTxt   = s.char ? _esc(s.char) : '<span class="order-slot-empty">— Character —</span>';
     const meTitle   = isAuthed ? 'My character' : 'Sign in to mark your character';
     return `
       <div class="order-slot" data-id="${s.id}">
         <div class="drag-handle">
           <span class="drag-dots">⠿</span><span class="row-num">${i + 1}.</span>
-          <img class="order-slot-portrait" src="${src}" onerror="this.src='asset/player.svg'" alt="">
+          <img class="order-slot-portrait" src="${src}" onerror="this.src='asset/players/default.svg'" alt="">
         </div>
         <div class="order-slot-info">
           <select class="order-slot-select" onchange="updateOrderSlot(${s.id}, this.value)" title="Pick manually">

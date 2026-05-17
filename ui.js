@@ -48,7 +48,7 @@ if (localStorage.getItem('theme') === 'auto') {
 
 function _updateThemeIcons() {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-  const asset = isLight ? 'asset/logo-w.svg' : 'asset/logo-b.svg';
+  const asset = isLight ? 'asset/logos/logo-w.svg' : 'asset/logos/logo-b.svg';
   const navImg = document.querySelector('.nav-brand img');
   if (navImg) navImg.src = asset;
 }
@@ -86,10 +86,10 @@ function charImgHTML(name) {
 }
 
 function resolveAvatar(profile) {
-  return profile?.avatar_url || profile?.default_avatar || 'asset/player.svg';
+  return profile?.avatar_url || profile?.default_avatar || 'asset/players/default.svg';
 }
 
-function playerAvatarHTML(url, large, fallback = 'asset/player.svg') {
+function playerAvatarHTML(url, large, fallback = 'asset/players/default.svg') {
   const src = (url || '').trim() || fallback;
   const cls = large ? 'player-avatar-lg' : 'player-avatar';
   return `<img class="${cls}" src="${_esc(src)}" alt="" onerror="this.src='${_esc(fallback)}'">`;
@@ -462,7 +462,7 @@ function renderAchievementsGridHTML(charAch, allChars, onClickFn = '_showAchDeta
     return `
       <button class="ach-tile" data-char="${_esc(c.name)}" onclick="${onClickFn}(this.dataset.char)" type="button" title="${_esc(c.name)}">
         <div class="ach-tile-main">
-          <img class="ach-tile-img" src="${charImgSrc(c.name)}" onerror="this.src='asset/player.svg'" alt="${_esc(c.name)}">
+          <img class="ach-tile-img" src="${charImgSrc(c.name)}" onerror="this.src='asset/players/default.svg'" alt="${_esc(c.name)}">
           <div class="ach-tile-rows">
             <div class="ach-tile-row" aria-label="Plays">${topMedal(stats.plays, 'medal')}</div>
             <div class="ach-tile-row" aria-label="Wins">${topMedal(stats.wins, 'cup')}</div>
@@ -501,7 +501,7 @@ function renderAchievementDetailHTML(charName, stats) {
   };
   return `
     <div class="ach-detail-head">
-      <img class="char-portrait identity-portrait" src="${charImgSrc(charName)}" onerror="this.src='asset/player.svg'" alt="">
+      <img class="char-portrait identity-portrait" src="${charImgSrc(charName)}" onerror="this.src='asset/players/default.svg'" alt="">
       <div class="ach-detail-name">${_esc(charName)}</div>
     </div>
     ${track(stats.plays, 'Plays', 'Play', 'medal')}

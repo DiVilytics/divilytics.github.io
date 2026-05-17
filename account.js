@@ -1,7 +1,7 @@
 let _acctChars      = [];
 let _acctAvatar     = null;
 let _acctNick       = null;
-let _acctFallback   = 'asset/player.svg';
+let _acctFallback   = 'asset/players/default.svg';
 let _acctBoxInfo    = {};
 let _acctOwnedBoxes = new Set();
 let _acctAch        = new Map();
@@ -56,7 +56,7 @@ function _renderPage() {
   const user    = getCurrentUser();
   _acctNick     = profile?.nickname   || null;
   _acctAvatar   = profile?.avatar_url || null;
-  _acctFallback = profile?.default_avatar || 'asset/player.svg';
+  _acctFallback = profile?.default_avatar || 'asset/players/default.svg';
 
   const since   = profile?.created_at ? `Since ${fmtDateShort(profile.created_at)}` : null;
   const email   = user?.email ? user.email : null;
@@ -134,11 +134,11 @@ function _buildBoxPicker() {
   picker.innerHTML = boxNames.map(box => {
     const info  = _acctBoxInfo[box] || {};
     const owned = _acctOwnedBoxes.has(box);
-    const src   = info.slug ? `asset/boxes/${info.slug}.webp` : 'asset/player.svg';
+    const src   = info.slug ? `asset/boxes/${info.slug}.webp` : 'asset/players/default.svg';
     const year  = info.year ? `<span class="box-option-year">${info.year}</span>` : '';
     return `
       <button class="box-option${owned ? ' selected' : ''}" data-box="${_esc(box)}" type="button" onclick="_toggleBox(this.dataset.box)" title="${_esc(box)}">
-        <img src="${src}" alt="${_esc(box)}" onerror="this.src='asset/player.svg'">
+        <img src="${src}" alt="${_esc(box)}" onerror="this.src='asset/players/default.svg'">
         <span class="box-option-name">${_esc(box)}</span>
         ${year}
       </button>`;
@@ -248,7 +248,7 @@ function _buildAvatarPicker() {
     img.src   = value;
     img.alt   = `Player ${i}`;
     img.dataset.value = value;
-    img.onerror = () => { img.src = 'asset/player.svg'; };
+    img.onerror = () => { img.src = 'asset/players/default.svg'; };
     img.onclick = () => _selectAvatar(value);
     picker.appendChild(img);
   }

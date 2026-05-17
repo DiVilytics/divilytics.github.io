@@ -162,7 +162,7 @@ function _renderRosterSummary(rows, monthLabel, gameCount) {
     const bottom = sortedRows.slice(-3).reverse();
     const row = r => `
       <a class="cs-mini-row" href="characters.html?char=${encodeURIComponent(r.name)}" title="${_esc(r.name)}">
-        <img class="char-portrait" src="${charImgSrc(r.name)}" onerror="this.src='asset/player.svg'" alt="${_esc(r.name)}">
+        <img class="char-portrait" src="${charImgSrc(r.name)}" onerror="this.src='asset/players/default.svg'" alt="${_esc(r.name)}">
         <span class="cs-mini-val">${fmt(r)}</span>
       </a>`;
     return `
@@ -216,7 +216,7 @@ async function renderRosterPage() {
         <div class="char-roster">${
           chars.map(c => `
             <a class="char-roster-item" href="characters.html?char=${encodeURIComponent(c.name)}">
-              <img class="char-roster-portrait" src="${charImgSrc(c.name)}" alt="" onerror="this.src='asset/player.svg'">
+              <img class="char-roster-portrait" src="${charImgSrc(c.name)}" alt="" onerror="this.src='asset/players/default.svg'">
               <div class="char-roster-name">${_esc(c.name)}</div>
             </a>`).join('')
         }</div>
@@ -268,7 +268,7 @@ async function _renderCharIdentity() {
   const objective  = objectives[csChar.name];
   const paceDot    = csChar.pace ? `<span class="pace-dot ${csChar.pace}" title="${_esc(csChar.pace)}"></span>` : '';
   document.getElementById('csIdentity').innerHTML =
-    `<div class="pf-identity"><img class="char-portrait identity-portrait zoomable" src="${charImgSrc(csChar.name)}" alt="" onerror="this.src='asset/player.svg'" onclick="showAvatarLightbox(this.src, 'asset/player.svg')"><span class="pf-name-block"><span class="pf-nick">${_esc(csChar.name)}</span><span class="pf-since">${_esc(csChar.box)}</span></span></div>${objective ? `<p class="char-objective">${paceDot}${_esc(objective)}</p>` : ''}`;
+    `<div class="pf-identity"><img class="char-portrait identity-portrait zoomable" src="${charImgSrc(csChar.name)}" alt="" onerror="this.src='asset/players/default.svg'" onclick="showAvatarLightbox(this.src, 'asset/players/default.svg')"><span class="pf-name-block"><span class="pf-nick">${_esc(csChar.name)}</span><span class="pf-since">${_esc(csChar.box)}</span></span></div>${objective ? `<p class="char-objective">${paceDot}${_esc(objective)}</p>` : ''}`;
 }
 
 function _foldBuckets(buckets) {
