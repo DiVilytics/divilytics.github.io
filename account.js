@@ -58,9 +58,7 @@ function _renderPage() {
   _acctAvatar   = profile?.avatar_url || null;
   _acctFallback = profile?.default_avatar || 'asset/players/default.svg';
 
-  const since   = profile?.created_at ? `Since ${fmtDateShort(profile.created_at)}` : null;
-  const email   = user?.email ? user.email : null;
-  const metaLn  = [since, email].filter(Boolean).join(' | ');
+  const metaLn  = profile?.created_at ? `Since ${fmtDateShort(profile.created_at)}` : null;
 
   const root = document.getElementById('acctRoot');
   root.className = '';
