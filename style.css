@@ -884,6 +884,9 @@ select optgroup { background: #1a1a1a; color: var(--muted); font-style: normal; 
   margin-left: 10px;
   margin-right: auto;
 }
+/* Keep each "symbol = meaning" pair on one line; only allow wrapping at the
+   " | " separators between pairs. */
+.players-legend .legend-item { white-space: nowrap; }
 
 .row-num { font-size: 12px; color: var(--dim); width: 16px; text-align: right; flex-shrink: 0; margin-right: 8px; }
 .drag-handle {
@@ -975,17 +978,6 @@ select:disabled {
   20%, 80% { transform: translateX(3px); }
   30%, 50%, 70% { transform: translateX(-5px); }
   40%, 60% { transform: translateX(5px); }
-}
-
-.edit-hint {
-  background: var(--accent-d);
-  border: 1px solid rgba(124, 106, 247, 0.25);
-  color: #c4bbff;
-  font-size: 12px;
-  line-height: 1.5;
-  padding: 9px 12px;
-  border-radius: var(--rs);
-  margin-bottom: 14px;
 }
 
 /* ── LEADERBOARD ──────────────────────────────────────────────────── */
@@ -1220,11 +1212,12 @@ select:disabled {
   margin: 0 0 8px;
 }
 .ach-grid {
-  /* Grid auto-fit keeps a min tile size of 80px and lets the row stretch to
-     fill available width. Each row stays justified instead of clustering on
-     the left with a ragged right edge. */
+  /* auto-fill (not auto-fit) keeps a fixed ~80px tile size: empty columns are
+     preserved rather than collapsed, so a player with only a few achievements
+     gets the same tile size as a fully-populated grid, with blank space on the
+     right instead of oversized stretched tiles. */
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
   gap: 10px;
   padding: 4px 0 8px;
 }
@@ -1246,6 +1239,7 @@ select:disabled {
 .ach-tile-main {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
 }
 .ach-tile-img {
@@ -1268,7 +1262,16 @@ select:disabled {
   line-height: 1;
 }
 .ach-tile-name {
+  /* Reserve space for two lines on every tile so rows have a uniform height
+     regardless of whether a name wraps, and vertically center the name within
+     it (so one-line names sit centered rather than pinned to the top). */
   font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(2 * 1.35em + 1px);
+}
+.ach-tile-name-text {
   font-weight: 600;
   /* Slightly generous line-height so descenders (g, y, p) aren't clipped by
      the -webkit-line-clamp overflow. */
@@ -1281,9 +1284,6 @@ select:disabled {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  /* Reserve space for two lines on every tile so rows have a uniform height
-     regardless of whether a name wraps. */
-  min-height: calc(2 * 1.35em + 1px);
 }
 .ach-row-icon { font-size: 12px; opacity: 0.7; }
 .ach-medal {
@@ -1699,6 +1699,9 @@ select:disabled {
 .claim-row.winner .claim-char { color: var(--gold); }
 .claim-nick { font-size: 12px; color: var(--muted); }
 .claim-nick.unclaimed { font-style: italic; }
+.claim-mine-actions { display: flex; align-items: center; gap: 10px; }
+.claim-topbar { margin-bottom: 8px; }
+.claim-share-row { display: flex; justify-content: flex-end; gap: 8px; margin: 4px 0 14px; }
 .claim-success {
   text-align: center;
   font-size: 13px;

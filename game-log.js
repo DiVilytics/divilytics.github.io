@@ -146,17 +146,22 @@ function clearLocationFilter() {
 	load(true);
 }
 
-let _locationOptions = [];
-
 async function loadLocationOptions() {
-	const { data } = await db.from('games').select('location').neq('location', null);
-	_locationOptions = [...new Set((data || []).map(r => r.location).filter(Boolean))].sort();
-	setVisible('locationSearch', _locationOptions.length > 0);
+	// Show the location search only if at least one game has a location (cheap
+	// count-only request — no rows transferred).
+	const { count } = await db.from('games')
+		.select('location', { count: 'exact', head: true })
+		.not('location', 'is', null);
+	setVisible('locationSearch', (count || 0) > 0);
 
+	// Same strategy as the player search: query the DB per keystroke. The
+	// search_locations(q) RPC does the DISTINCT + LIMIT server-side, so we never
+	// pull every game's location into the browser (and never hit the row cap).
 	attachSearchBox({
 		inputId:    'locationSearchInput',
 		dropdownId: 'locationDropdown',
-		fetchOptions: q => _locationOptions.filter(l => l.toLowerCase().includes(q.toLowerCase())),
+		debounceMs: 200,
+		fetchOptions: dbSearchSource(q => db.rpc('search_locations', { q })),
 		renderOption: l => `<div class="cs-option" data-loc="${_esc(l)}">${_esc(l)}</div>`,
 		onSelect:     opt => _applyLocationOption(opt.dataset.loc),
 		onEmpty:      () => { if (glFilterLocation) { glFilterLocation = null; load(true); } },

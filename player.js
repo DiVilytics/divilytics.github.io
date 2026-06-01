@@ -92,7 +92,22 @@ async function load() {
     return;
   }
 
-  const gameIds = [...new Set((myRows || []).map(r => r.game_id))];
+  let gameIds = (myRows || []).map(r => r.game_id);
+
+  // On your own profile, also include games you created — even ones you haven't
+  // claimed a character in (e.g. after releasing your claim). Otherwise such a
+  // game would vanish from your profile, taking its manage/QR actions with it.
+  const me      = getCurrentUser();
+  const profile = getCurrentProfile();
+  if (me && profile && profile.nickname === pfNick) {
+    const { data: createdRows } = await db
+      .from('games')
+      .select('id')
+      .eq('created_by', me.id);
+    gameIds = gameIds.concat((createdRows || []).map(r => r.id));
+  }
+
+  gameIds = [...new Set(gameIds)];
 
   const { games, players } = await fetchGamesWithPlayers(gameIds, { orderByPlayedAtDesc: true });
   pfGames   = games;
@@ -100,6 +115,14 @@ async function load() {
   pfAch     = computeCharacterAchievements(players.filter(p => p.nickname === pfNick));
 
   document.getElementById('pfRoot').className = '';
+
+  // If we just came back from opening a game, scroll that card into view once
+  // the list has rendered.
+  try {
+    _pfScrollToId = sessionStorage.getItem('pfReturnGameId');
+    if (_pfScrollToId) sessionStorage.removeItem('pfReturnGameId');
+  } catch (_) { _pfScrollToId = null; }
+
   render();
 }
 
@@ -138,15 +161,12 @@ function _attachPlayerSearch() {
     inputId:    'pfJumpInput',
     dropdownId: 'pfDropdown',
     debounceMs: 200,
-    fetchOptions: async q => {
-      const { data } = await db
-        .from('profiles')
-        .select('nickname, avatar_url, default_avatar')
-        .ilike('nickname', `${q}%`)
-        .not('nickname', 'is', null)
-        .limit(8);
-      return data || [];
-    },
+    fetchOptions: dbSearchSource(q => db
+      .from('profiles')
+      .select('nickname, avatar_url, default_avatar')
+      .ilike('nickname', `${q}%`)
+      .not('nickname', 'is', null)
+      .limit(8)),
     renderOption: p => `
       <div class="cs-option" data-nick="${_esc(p.nickname)}">
         ${playerAvatarHTML(resolveAvatar(p))}
@@ -267,6 +287,8 @@ function render() {
   _renderGamesList(keepIds);
 }
 
+let _pfScrollToId = null;
+
 function _renderGamesList(keepIds = pfFilteredGameIds()) {
   let games = pfGames.filter(g => keepIds.has(g.id));
 
@@ -275,6 +297,13 @@ function _renderGamesList(keepIds = pfFilteredGameIds()) {
       pfPlayers.filter(p => keepIds.has(p.game_id) && p.nickname === pfNick && p.is_winner).map(p => p.game_id)
     );
     games = games.filter(g => winGameIds.has(g.id));
+  }
+
+  // Returning from an opened game: make sure its card is within the rendered
+  // page so we can scroll to it (it may sit beyond the current "Load more" cut).
+  if (_pfScrollToId) {
+    const idx = games.findIndex(g => g.id === _pfScrollToId);
+    if (idx >= pfDisplayLimit) pfDisplayLimit = Math.ceil((idx + 1) / PAGE_SIZE) * PAGE_SIZE;
   }
 
   const visible = games.slice(0, pfDisplayLimit);
@@ -294,6 +323,14 @@ function _renderGamesList(keepIds = pfFilteredGameIds()) {
     btn.onclick = () => { btn.disabled = true; pfLoadMore(); };
     list.appendChild(btn);
   }
+
+  if (_pfScrollToId) {
+    const target = _pfScrollToId;
+    _pfScrollToId = null;
+    requestAnimationFrame(() => {
+      document.getElementById(`pf-game-${target}`)?.scrollIntoView({ block: 'center' });
+    });
+  }
 }
 
 function pfLoadMore() {
@@ -301,95 +338,23 @@ function pfLoadMore() {
   _renderGamesList();
 }
 function buildProfileCard(g, gp) {
-  const role        = gameUserRole(g, gp, getCurrentUser());
-  const canFillMeta = role.isParticipant && (!g.duration_minutes || !g.num_turns || !g.location);
-  const actions     = role.isParticipant ? `
+  const role    = gameUserRole(g, gp, getCurrentUser());
+  const actions = role.isParticipant ? `
     <div class="card-actions">
-      <button class="btn btn-ghost btn-sm" onclick="pfShowGameQR('${g.id}')">QR Code</button>
-      ${canFillMeta ? `<button class="btn btn-ghost btn-sm" onclick="pfEditGame('${g.id}')">Edit</button>` : ''}
+      <a class="btn btn-ghost btn-sm" href="join.html?game=${g.id}" onclick="pfRememberReturn('${g.id}')">Open</a>
       ${role.isCreator ? `<button class="btn btn-danger btn-sm" onclick="pfDeleteGame('${g.id}')">Delete</button>` : ''}
     </div>` : '';
   const me = getCurrentUser();
-  return buildGameCard(g, gp, { isSelf: p => me && p.user_id === me.id, actions, onLocationClick: pfSetLocationFilter });
+  const card = buildGameCard(g, gp, { isSelf: p => me && p.user_id === me.id, actions, onLocationClick: pfSetLocationFilter });
+  card.id = `pf-game-${g.id}`;   // so we can scroll back to it after opening a game
+  return card;
 }
 
 // ── GAME ACTIONS ──────────────────────────────────────────────────────────────
 
-let _pfEditingId = null;
-
-function pfEditGame(id) {
-  const g = pfGames.find(x => x.id === id);
-  if (!g) return;
-  _pfEditingId = id;
-
-  const dur  = document.getElementById('pfEditDur');
-  const trn  = document.getElementById('pfEditTurns');
-  const loc  = document.getElementById('pfEditLocation');
-
-  dur.value = g.duration_minutes || '';
-  trn.value = g.num_turns || '';
-  loc.value = g.location || '';
-
-  // Lock fields that already have a value
-  dur.disabled = !!g.duration_minutes;
-  trn.disabled = !!g.num_turns;
-  loc.disabled = !!g.location;
-
-  clearError('pfEditErr');
-  const btn = document.getElementById('pfEditSaveBtn');
-  btn.disabled    = false;
-  btn.textContent = 'Save Changes';
-
-  openOverlay('pfEditOverlay');
-}
-
-function pfCloseEdit() {
-  _pfEditingId = null;
-  closeOverlay('pfEditOverlay');
-}
-
-async function pfSaveEdit() {
-  if (!_pfEditingId) return;
-  const g = pfGames.find(x => x.id === _pfEditingId);
-  if (!g) { pfCloseEdit(); return; }
-
-  const dur      = parseInt(document.getElementById('pfEditDur').value)   || null;
-  const turns    = parseInt(document.getElementById('pfEditTurns').value) || null;
-  const location = document.getElementById('pfEditLocation').value.trim() || null;
-
-  const patch = {};
-  if (!g.duration_minutes && dur)      patch.duration_minutes = dur;
-  if (!g.num_turns        && turns)    patch.num_turns        = turns;
-  if (!g.location         && location) patch.location         = location;
-
-  if (!Object.keys(patch).length) {
-    pfCloseEdit();
-    return;
-  }
-
-  const btn   = document.getElementById('pfEditSaveBtn');
-  const errEl = document.getElementById('pfEditErr');
-  btn.disabled    = true;
-  btn.textContent = 'Saving…';
-
-  const { error } = await db.from('games').update(patch).eq('id', _pfEditingId);
-
-  if (error) {
-    showError(errEl, error.message);
-    btn.disabled    = false;
-    btn.textContent = 'Save Changes';
-    return;
-  }
-
-  pfCloseEdit();
-  await load();
-}
-
-function pfShowGameQR(id) {
-  const url = new URL(`join.html?game=${id}`, location.href).href;
-  document.getElementById('qrTitle').textContent = 'Share with players';
-  document.getElementById('qrBlurb').textContent = 'Other players can scan this QR code to claim their character and appear in the game record.';
-  showQRModal(url, 'qrCode', 'qrOverlay');
+// Remember which game we're opening so we can scroll back to it on return.
+function pfRememberReturn(id) {
+  try { sessionStorage.setItem('pfReturnGameId', id); } catch (_) {}
 }
 
 let _pfPendingDeleteGameId = null;
@@ -411,10 +376,6 @@ async function pfConfirmDeleteGame() {
   const { error } = await db.from('games').delete().eq('id', id);
   if (error) { alert(error.message); return; }
   await load();
-}
-
-function closeProfileQR() {
-  closeOverlay('qrOverlay');
 }
 
 // ── ACHIEVEMENT DETAIL ────────────────────────────────────────────────────────

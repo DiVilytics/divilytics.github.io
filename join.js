@@ -75,6 +75,7 @@ function render() {
   }
 
   const myClaim = claimPlayers.find(p => p.user_id === user.id);
+  const role    = gameUserRole(claimGame, claimPlayers, user);
 
   const meta = [
     fmtDuration(claimGame.duration_minutes),
@@ -85,7 +86,14 @@ function render() {
   const rowsHTML = claimPlayers.map(p => {
     const isMine = p.user_id === user.id;
     let actionHTML;
-    if (p.nickname) {
+    if (isMine) {
+      // Your own claim: let you release it (e.g. if you picked the wrong one).
+      actionHTML = `
+        <div class="claim-mine-actions">
+          <span class="claim-nick">${_esc(p.nickname)}</span>
+          <button class="btn btn-ghost btn-sm" onclick="releaseCharacter('${p.id}')">Release</button>
+        </div>`;
+    } else if (p.nickname) {
       actionHTML = `<div class="claim-nick">${_esc(p.nickname)}</div>`;
     } else if (myClaim) {
       actionHTML = `<div class="claim-nick unclaimed">Unclaimed</div>`;
@@ -107,9 +115,82 @@ function render() {
       <div class="claim-date">${fmtDateTime(claimGame.played_at)}</div>
       ${meta ? `<div class="claim-meta">${meta}</div>` : ''}
     </div>
+    <div class="claim-share-row">
+      ${role.isParticipant ? `<button class="btn btn-ghost btn-sm" onclick="editGameDetails()">Edit details</button>` : ''}
+      <button class="btn btn-ghost btn-sm" onclick="shareGame()">Share QR</button>
+    </div>
     <div class="section-label">Players</div>
     <div class="claim-rows">${rowsHTML}</div>
     ${myClaim ? `<p class="claim-success">You are playing as <strong>${charImgHTML(myClaim.character)}${_esc(myClaim.character)}</strong> in this game.</p>` : ''}`;
+}
+
+// ── NAV / SHARE ───────────────────────────────────────────────────────────────
+
+function claimGoBack() {
+  // Return to wherever we came from (e.g. the player profile); fall back to the
+  // profile page when the claim page was opened cold (e.g. via a shared QR).
+  if (history.length > 1) { history.back(); return; }
+  location.href = 'player.html';
+}
+
+function shareGame() {
+  if (!claimGame) return;
+  const url = new URL(`join.html?game=${claimGame.id}`, location.href).href;
+  showQRModal(url, 'qrCode', 'qrOverlay');
+}
+
+// ── EDIT GAME DETAILS ─────────────────────────────────────────────────────────
+
+function editGameDetails() {
+  if (!claimGame) return;
+  document.getElementById('editLocation').value = claimGame.location || '';
+  document.getElementById('editDur').value      = claimGame.duration_minutes || '';
+  document.getElementById('editTurns').value    = claimGame.num_turns || '';
+  clearError('editDetailsErr');
+  const btn = document.getElementById('editDetailsSaveBtn');
+  btn.disabled    = false;
+  btn.textContent = 'Save Changes';
+  openOverlay('editDetailsOverlay');
+}
+
+function closeEditDetails() {
+  closeOverlay('editDetailsOverlay');
+}
+
+async function saveGameDetails() {
+  if (!claimGame) return;
+
+  const dur      = parseInt(document.getElementById('editDur').value)   || null;
+  const turns    = parseInt(document.getElementById('editTurns').value) || null;
+  const location = document.getElementById('editLocation').value.trim() || null;
+
+  // Always write the current values (a cleared field is saved as null).
+  const patch = { duration_minutes: dur, num_turns: turns, location: location };
+
+  // No-op if nothing actually changed.
+  if (dur === (claimGame.duration_minutes || null) &&
+      turns === (claimGame.num_turns || null) &&
+      location === (claimGame.location || null)) {
+    closeEditDetails();
+    return;
+  }
+
+  const btn   = document.getElementById('editDetailsSaveBtn');
+  const errEl = document.getElementById('editDetailsErr');
+  btn.disabled    = true;
+  btn.textContent = 'Saving…';
+
+  const { error } = await db.from('games').update(patch).eq('id', claimGame.id);
+
+  if (error) {
+    showError(errEl, error.message);
+    btn.disabled    = false;
+    btn.textContent = 'Save Changes';
+    return;
+  }
+
+  closeEditDetails();
+  await init();
 }
 
 // ── CLAIM ─────────────────────────────────────────────────────────────────────
@@ -128,7 +209,7 @@ function _ensureClaimConfirmModal() {
           <button class="sheet-close" onclick="cancelClaim()">×</button>
         </div>
         <div class="sheet-body">
-          <p class="confirm-text">You're about to claim <strong id="claimConfirmChar" class="text-emph"></strong> in this game. This can't be undone!</p>
+          <p class="confirm-text">You're about to claim <strong id="claimConfirmChar" class="text-emph"></strong> in this game. Picked the wrong one? You can release it afterwards.</p>
         </div>
         <div class="sheet-footer sheet-footer-row">
           <button class="btn btn-ghost"   onclick="cancelClaim()">Cancel</button>
@@ -185,6 +266,86 @@ async function confirmClaim() {
     .is('user_id', null);
 
   cancelClaim();
+
+  if (error) {
+    const root = document.getElementById('claimRoot');
+    const errEl = document.createElement('div');
+    errEl.className = 'err show';
+    errEl.textContent = error.message;
+    root.prepend(errEl);
+    return;
+  }
+
+  await init();
+}
+
+// ── RELEASE ───────────────────────────────────────────────────────────────────
+
+let _pendingReleaseId = null;
+
+function _ensureReleaseConfirmModal() {
+  if (document.getElementById('releaseConfirmOverlay')) return;
+  const tpl = document.createElement('div');
+  tpl.innerHTML = `
+    <div class="overlay" id="releaseConfirmOverlay" onclick="if(event.target===this) cancelRelease()">
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <h3>Release this character?</h3>
+          <button class="sheet-close" onclick="cancelRelease()">×</button>
+        </div>
+        <div class="sheet-body">
+          <p class="confirm-text">This frees up <strong id="releaseConfirmChar" class="text-emph"></strong> so it can be claimed again — by you or another player.</p>
+        </div>
+        <div class="sheet-footer sheet-footer-row">
+          <button class="btn btn-ghost"   onclick="cancelRelease()">Cancel</button>
+          <button class="btn btn-danger" id="releaseConfirmBtn" onclick="confirmRelease()">Release</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(tpl.firstElementChild);
+}
+
+function releaseCharacter(playerId) {
+  const user = getCurrentUser();
+  if (!user) return;
+
+  const player = claimPlayers.find(p => p.id === playerId);
+  if (!player || player.user_id !== user.id) return;
+
+  _ensureReleaseConfirmModal();
+  _pendingReleaseId = playerId;
+  document.getElementById('releaseConfirmChar').innerHTML = charImgHTML(player.character) + _esc(player.character);
+  const btn = document.getElementById('releaseConfirmBtn');
+  btn.disabled    = false;
+  btn.textContent = 'Release';
+  openOverlay('releaseConfirmOverlay');
+}
+
+function cancelRelease() {
+  _pendingReleaseId = null;
+  const el = document.getElementById('releaseConfirmOverlay');
+  if (el) closeOverlay('releaseConfirmOverlay');
+}
+
+async function confirmRelease() {
+  if (!_pendingReleaseId) return;
+  const user = getCurrentUser();
+  if (!user) { cancelRelease(); return; }
+
+  const playerId = _pendingReleaseId;
+
+  const btn = document.getElementById('releaseConfirmBtn');
+  btn.disabled    = true;
+  btn.textContent = 'Releasing…';
+
+  const { error } = await db
+    .from('game_players')
+    .update({ user_id: null, nickname: null })
+    .eq('id', playerId)
+    .eq('user_id', user.id);
+
+  cancelRelease();
 
   if (error) {
     const root = document.getElementById('claimRoot');

@@ -77,64 +77,6 @@
   </div>
 </div>
 
-<!-- QR Code sheet (shared for profile + individual games) -->
-<div class="overlay" id="qrOverlay">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-header">
-      <h3 id="qrTitle">Share your profile</h3>
-      <button class="sheet-close" onclick="closeProfileQR()">×</button>
-    </div>
-    <div class="sheet-body">
-      <p id="qrBlurb" class="modal-hint">Others can scan this to view your player profile.</p>
-      <div class="qr-wrap">
-        <div id="qrCode"></div>
-      </div>
-      <div class="qr-url-row">
-        <div class="qr-url" id="qrUrlText"></div>
-        <button class="pf-btn" onclick="copyQrUrl()" title="Copy link">⎘</button>
-      </div>
-    </div>
-    <div class="sheet-footer">
-      <button class="btn btn-primary" onclick="closeProfileQR()">Done</button>
-    </div>
-  </div>
-</div>
-
-<!-- Edit game sheet -->
-<div class="overlay" id="pfEditOverlay" onclick="if(event.target===this) pfCloseEdit()">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-header">
-      <h3>Edit Game</h3>
-      <button class="sheet-close" onclick="pfCloseEdit()">×</button>
-    </div>
-    <div class="sheet-body">
-      <div class="err" id="pfEditErr"></div>
-      <p class="edit-hint">
-        You can only fill in missing info (duration, round count, location). Once set, a field can't be changed; delete the game to redo it.
-      </p>
-      <div class="field">
-        <label>Location <span class="optional"></span></label>
-        <input type="text" id="pfEditLocation" maxlength="60" placeholder="optional">
-      </div>
-      <div class="form-row">
-        <div class="field">
-          <label>Duration <span class="optional">(min)</span></label>
-          <input type="number" id="pfEditDur" min="1" max="999" placeholder="optional">
-        </div>
-        <div class="field">
-          <label>Rounds <span class="optional"></span></label>
-          <input type="number" id="pfEditTurns" min="1" max="999" placeholder="optional">
-        </div>
-      </div>
-    </div>
-    <div class="sheet-footer sheet-footer-row">
-      <button class="btn btn-ghost"   onclick="pfCloseEdit()">Cancel</button>
-      <button class="btn btn-primary" id="pfEditSaveBtn" onclick="pfSaveEdit()">Save Changes</button>
-    </div>
-  </div>
-</div>
 
 <!-- Delete game confirmation -->
 <div class="overlay" id="pfDeleteGameOverlay" onclick="if(event.target===this) pfCancelDeleteGame()">
@@ -155,7 +97,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="config.js"></script>
 <script src="db.js"></script>
   <script src="ui.js"></script>

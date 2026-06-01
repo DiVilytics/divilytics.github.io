@@ -4,11 +4,13 @@
   const saved = localStorage.getItem('theme');
   if (saved === 'light') {
     document.documentElement.setAttribute('data-theme', 'light');
-  } else if (saved === 'auto') {
+  } else if (saved === 'dark') {
+    // forced dark: no attribute needed
+  } else {
+    // 'auto' or unset (first visit): follow the device preference
     if (!window.matchMedia('(prefers-color-scheme: dark)').matches)
       document.documentElement.setAttribute('data-theme', 'light');
   }
-  // 'dark' or unset: no attribute needed
 })();
 
 let _autoMql = null;
@@ -40,8 +42,9 @@ function _applyTheme(state) {
   if (typeof _updateHomeThemeBtns === 'function') _updateHomeThemeBtns();
 }
 
-// Re-attach auto listener on page load if theme was previously set to auto
-if (localStorage.getItem('theme') === 'auto') {
+// Re-attach auto listener on page load when following the device (explicit
+// 'auto', or unset on first visit) so live system theme changes are reflected.
+if ((localStorage.getItem('theme') || 'auto') === 'auto') {
   _autoMql = window.matchMedia('(prefers-color-scheme: dark)');
   _autoMql.addEventListener('change', _onAutoChange);
 }
@@ -61,13 +64,13 @@ function _nextTheme(current) {
 }
 
 function toggleTheme() {
-  _applyTheme(_nextTheme(localStorage.getItem('theme') || 'dark'));
+  _applyTheme(_nextTheme(localStorage.getItem('theme') || 'auto'));
 }
 
 function _updateThemeBtn() {
   const btn = document.getElementById('themeToggleBtn');
   if (!btn) return;
-  const current = localStorage.getItem('theme') || 'dark';
+  const current = localStorage.getItem('theme') || 'auto';
   const next    = _nextTheme(current);
   const icons   = { dark: '🌙', light: '☀️', auto: '🌗' };
   const titles  = { dark: 'Force dark', light: 'Force light', auto: 'Follow system' };
@@ -468,7 +471,7 @@ function renderAchievementsGridHTML(charAch, allChars, onClickFn = '_showAchDeta
             <div class="ach-tile-row" aria-label="Wins">${topMedal(stats.wins, 'cup')}</div>
           </div>
         </div>
-        <div class="ach-tile-name">${_fmtAchTileName(c.name)}</div>
+        <div class="ach-tile-name"><span class="ach-tile-name-text">${_fmtAchTileName(c.name)}</span></div>
       </button>`;
   }).join('');
   return `
@@ -523,6 +526,17 @@ function renderAchievementDetailHTML(charName, stats) {
 //   onDirectEnter(query) : Enter w/ no active option fires this with raw text
 //   onEmpty()            : called when query goes blank (e.g. clear filters)
 //   debounceMs           : 0 = instant; >0 debounces fetchOptions
+// Wrap a Supabase query-builder as a per-keystroke fetchOptions source for
+// attachSearchBox. `buildQuery(term)` runs server-side on every keystroke and
+// resolves to { data }; we return the rows (or []). Used by both the player and
+// location search boxes so matching/limiting happens in the DB, not the browser.
+function dbSearchSource(buildQuery) {
+  return async term => {
+    const { data } = await buildQuery(term);
+    return data || [];
+  };
+}
+
 function attachSearchBox(opts) {
   const {
     inputId, dropdownId,

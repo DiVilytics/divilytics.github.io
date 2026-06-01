@@ -6,7 +6,7 @@ function setTheme(t) {
 function _updateHomeThemeBtns() {
   const row = document.getElementById('homeThemeRow');
   if (!row) return;
-  const current = localStorage.getItem('theme') || 'dark';
+  const current = localStorage.getItem('theme') || 'auto';
   const btns = row.querySelectorAll('.btn');
   btns[0].disabled = current === 'dark';
   btns[1].disabled = current === 'light';
