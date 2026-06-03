@@ -1172,6 +1172,153 @@ select:disabled {
 }
 .avatar-option.selected { border-color: var(--accent); opacity: 1; }
 
+/* ── COMPOSITE AVATAR (recipe) ────────────────────────────────────── */
+/* A built avatar renders as a sized box (it reuses the same size class as a
+   plain <img>, e.g. .player-avatar / .nav-avatar) with the part PNGs stacked
+   inside and clipped to the circle. */
+.avatar-stack {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+}
+.avatar-stack img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+  /* The source art sits slightly left of centre; nudge every layer right.
+     Percentage keeps it proportional at every avatar size (nav → lightbox). */
+  transform: translateX(2%);
+}
+/* Composite shown in the zoom lightbox needs an explicit square size since the
+   stacked layers are absolutely positioned (no intrinsic dimensions). */
+.avatar-stack.avatar-lightbox-img {
+  width: min(420px, 80vw);
+  height: min(420px, 80vw);
+  max-width: none;
+  max-height: none;
+  aspect-ratio: 1 / 1;
+}
+
+/* ── AVATAR BUILDER ───────────────────────────────────────────────── */
+.avatar-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0 12px;
+}
+.avatar-tab {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--s1);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.avatar-tab.selected {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-d);
+}
+.builder-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.builder-preview {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+}
+.builder-preview-av {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--s2);
+}
+.builder-controls {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.builder-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+/* Part rows reuse the compact month-nav buttons; shrink them a touch more
+   here and remove inter-row spacing so the eight slots stay tight. */
+.builder-row .cs-month-nav {
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
+}
+.builder-row-label {
+  font-size: 0.82rem;
+  color: var(--text);
+}
+.builder-stepper {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.builder-count {
+  min-width: 38px;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.builder-num { color: var(--text); font-weight: 600; }
+/* Give the background row a little breathing room from the tight part rows. */
+.builder-row-bg { align-items: flex-start; margin-top: 8px; }
+.builder-swatches {
+  display: grid;
+  grid-template-columns: repeat(5, 24px);
+  gap: 6px;
+  justify-content: flex-end;
+}
+.builder-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+}
+.builder-swatch.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-d); }
+.builder-swatch-custom {
+  position: relative;
+  background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
+}
+.builder-swatch-custom input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+.builder-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
 .box-picker {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
@@ -1225,12 +1372,18 @@ select:disabled {
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  /* Pin the image row to the top so icons line up across the whole grid
+     regardless of name length; the name below fills the remaining space and
+     centres its text, so one-line names look balanced without dropping the
+     icon. min-height keeps every tile the same size. */
+  justify-content: flex-start;
+  min-height: 86px;
   box-sizing: border-box;
   gap: 3px;
   background: var(--s1);
   border: 0;
   border-radius: var(--rs);
-  padding: 4px 6px 6px;
+  padding: 6px 6px 4px;
   cursor: pointer;
   font: inherit;
   color: var(--text);
@@ -1262,14 +1415,14 @@ select:disabled {
   line-height: 1;
 }
 .ach-tile-name {
-  /* Reserve space for two lines on every tile so rows have a uniform height
-     regardless of whether a name wraps, and vertically center the name within
-     it (so one-line names sit centered rather than pinned to the top). */
+  /* Fill the space under the (top-pinned) icon and centre the name in it, with
+     room for two lines so wrapping names don't change the tile height. */
+  flex: 1;
+  min-height: calc(2 * 1.35em + 1px);
   font-size: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: calc(2 * 1.35em + 1px);
 }
 .ach-tile-name-text {
   font-weight: 600;

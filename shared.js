@@ -224,7 +224,7 @@ function _updateAuthUI() {
 
   if (_currentUser) {
     const avatarSrc = resolveAvatar(_currentProfile);
-    el.innerHTML = `${themeBtn}<a class="nav-avatar-link active" href="account.html" title="Account"><img class="nav-avatar" src="${_esc(avatarSrc)}" onerror="this.src='asset/players/default.svg'" alt=""></a>`;
+    el.innerHTML = `${themeBtn}<a class="nav-avatar-link active" href="account.html" title="Account">${avatarHTML(avatarSrc, { cls: 'nav-avatar' })}</a>`;
   } else {
     el.innerHTML = `${themeBtn}<button class="nav-avatar-btn" onclick="goToSignIn()" title="Sign in"><img class="nav-avatar nav-avatar-guest" src="asset/players/default.svg" alt=""></button>`;
   }

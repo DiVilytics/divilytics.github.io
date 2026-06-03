@@ -64,10 +64,7 @@ function _renderPage() {
   root.className = '';
   root.innerHTML = `
     <div class="acct-identity">
-      <img class="player-avatar-lg zoomable" id="acctAvatarPreview"
-        src="${_esc(_acctAvatar || _acctFallback)}"
-        onerror="this.src='${_esc(_acctFallback)}'"
-        onclick="showAvatarLightbox(this.src, '${_esc(_acctFallback)}')" alt="">
+      <span id="acctAvatarPreviewWrap"></span>
       <div>
         <div class="acct-nick">${_esc(_acctNick || '|')}</div>
         ${metaLn ? `<div class="pf-since">${_esc(metaLn)}</div>` : ''}
@@ -96,7 +93,14 @@ function _renderPage() {
         <button class="btn btn-ghost btn-sm" id="removeAvatarBtn" onclick="removeAvatar()" ${_acctAvatar ? '' : 'disabled'}>Use default icon</button>
       </div>
       <div class="err" id="avatarErr"></div>
-      <div class="avatar-picker" id="avatarPicker"></div>
+      <div class="avatar-tabs" role="tablist">
+        <button class="avatar-tab selected" id="avatarTabPhotos"  type="button" onclick="_showAvatarTab('photos')">Photos</button>
+        <button class="avatar-tab"          id="avatarTabBuilder" type="button" onclick="_showAvatarTab('builder')">Build your own</button>
+      </div>
+      <div class="avatar-pane" id="avatarPanePhotos">
+        <div class="avatar-picker" id="avatarPicker"></div>
+      </div>
+      <div class="avatar-pane" id="avatarPaneBuilder" hidden></div>
     </div>
 
     <div class="acct-section">
@@ -116,8 +120,32 @@ function _renderPage() {
     </div>
   `;
 
+  _renderAcctPreview();
   _buildAvatarPicker();
+  _buildAvatarBuilder();
   _buildBoxPicker();
+}
+
+// Render the large identity avatar (top of page) from the current value, which
+// may be a preset photo path or a builder recipe.
+function _renderAcctPreview() {
+  const wrap = document.getElementById('acctAvatarPreviewWrap');
+  if (!wrap) return;
+  wrap.innerHTML = avatarHTML(_acctAvatar || _acctFallback, {
+    cls: 'player-avatar-lg', extraClass: 'zoomable', id: 'acctAvatarPreview',
+    lightbox: true, fallback: _acctFallback,
+  });
+}
+
+function _showAvatarTab(name) {
+  const isBuilder = name === 'builder';
+  document.getElementById('avatarTabPhotos') ?.classList.toggle('selected', !isBuilder);
+  document.getElementById('avatarTabBuilder')?.classList.toggle('selected',  isBuilder);
+  const photos  = document.getElementById('avatarPanePhotos');
+  const builder = document.getElementById('avatarPaneBuilder');
+  if (photos)  photos.hidden  = isBuilder;
+  if (builder) builder.hidden = !isBuilder;
+  if (isBuilder) _renderBuilderPreview();
 }
 
 function _buildBoxPicker() {
@@ -252,6 +280,146 @@ function _buildAvatarPicker() {
   }
 }
 
+// ── AVATAR BUILDER ───────────────────────────────────────────────────────────
+// Compose a player icon by picking one transparent PNG part per body slot over
+// a background colour. The body parts, their draw order and per-part option
+// counts live in AVATAR_BUILDER (ui.js) — the same config the renderer uses, so
+// the builder and every display point can never drift. Saving stores a compact
+// recipe string in avatar_url; avatarHTML() composes it on the fly everywhere.
+// The live preview here uses that same render path (no rasterisation anywhere).
+// Disney Villainous jewel tones — villain signature colours over a dark, moody
+// base (Maleficent purple/green, Ursula teal, Jafar/Hook crimson, Prince John
+// gold, Hades blue, the black-and-gold box).
+const AVATAR_BG_SWATCHES = ['#4a1d6e', '#6b2d8c', '#7d1f3f', '#a01515', '#b8621b', '#c9a227', '#1f7a4d', '#0e5c6b', '#15182e'];
+const AVATAR_BUILDER_LS  = 'divilytics:avatarBuilder';
+
+let _builderSel = {};
+let _builderBg  = AVATAR_BUILDER.defaultBg;
+
+// Seed the builder from the saved avatar if it's already a recipe, else from
+// the last edit kept in localStorage, else defaults.
+function _loadBuilderState() {
+  const fromRecipe = parseAvatarRecipe(_acctAvatar);
+  let saved = null;
+  if (!fromRecipe) {
+    try { saved = JSON.parse(localStorage.getItem(AVATAR_BUILDER_LS) || 'null'); } catch (_) {}
+  }
+  _builderSel = {};
+  for (const part of AVATAR_BUILDER.parts) {
+    const n = fromRecipe ? fromRecipe.parts[part.key] : saved?.sel?.[part.key];
+    _builderSel[part.key] = (Number.isInteger(n) && n >= 1 && n <= part.count) ? n : 1;
+  }
+  if (fromRecipe)                                                   _builderBg = fromRecipe.bg;
+  else if (typeof saved?.bg === 'string' && /^#[0-9a-f]{6}$/i.test(saved.bg)) _builderBg = saved.bg;
+  else                                                             _builderBg = AVATAR_BUILDER.defaultBg;
+}
+
+function _saveBuilderState() {
+  try { localStorage.setItem(AVATAR_BUILDER_LS, JSON.stringify({ sel: _builderSel, bg: _builderBg })); } catch (_) {}
+}
+
+function _builderRecipe() {
+  return serializeAvatarRecipe(_builderSel, _builderBg);
+}
+
+function _buildAvatarBuilder() {
+  const pane = document.getElementById('avatarPaneBuilder');
+  if (!pane) return;
+  _loadBuilderState();
+
+  const rows = AVATAR_BUILDER.parts.map(part => `
+    <div class="builder-row" data-key="${part.key}">
+      <span class="builder-row-label">${part.label}</span>
+      <div class="builder-stepper">
+        <button class="cs-month-nav" type="button" onclick="_cyclePart('${part.key}', -1)" ${part.count < 2 ? 'disabled' : ''} aria-label="Previous ${part.label}">‹</button>
+        <span class="builder-count"><span class="builder-num">${_builderSel[part.key]}</span> / ${part.count}</span>
+        <button class="cs-month-nav" type="button" onclick="_cyclePart('${part.key}', 1)" ${part.count < 2 ? 'disabled' : ''} aria-label="Next ${part.label}">›</button>
+      </div>
+    </div>`).join('');
+
+  const swatches = AVATAR_BG_SWATCHES.map(c =>
+    `<button class="builder-swatch${c === _builderBg ? ' selected' : ''}" type="button" data-color="${c}" style="background:${c}" onclick="_setBg('${c}')" aria-label="Background ${c}"></button>`
+  ).join('');
+
+  pane.innerHTML = `
+    <div class="builder-wrap">
+      <div class="builder-preview" id="builderPreview"></div>
+      <div class="builder-controls">
+        ${rows}
+        <div class="builder-row builder-row-bg">
+          <span class="builder-row-label">Background</span>
+          <div class="builder-swatches">
+            ${swatches}
+            <label class="builder-swatch builder-swatch-custom" title="Custom colour">
+              <input type="color" id="builderBgInput" value="${_builderBg}" oninput="_setBg(this.value)">
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="builder-actions">
+      <button class="btn btn-ghost btn-sm" type="button" onclick="_randomizeBuilder()">🎲 Randomize</button>
+      <button class="btn btn-primary btn-sm" id="builderSaveBtn" onclick="_saveBuiltAvatar()">Use this icon</button>
+    </div>`;
+
+  _renderBuilderPreview();
+}
+
+// Live preview, composed through the shared renderer.
+function _renderBuilderPreview() {
+  const host = document.getElementById('builderPreview');
+  if (host) host.innerHTML = avatarHTML(_builderRecipe(), { cls: 'builder-preview-av' });
+}
+
+function _cyclePart(key, dir) {
+  const part = AVATAR_BUILDER.parts.find(p => p.key === key);
+  if (!part || part.count < 2) return;
+  _builderSel[key] = ((_builderSel[key] - 1 + dir + part.count) % part.count) + 1;
+  const row = document.querySelector(`.builder-row[data-key="${key}"] .builder-num`);
+  if (row) row.textContent = _builderSel[key];
+  _saveBuilderState();
+  _renderBuilderPreview();
+}
+
+// Roll a random part for every slot and a random villain background, then sync
+// the steppers, swatches and preview (without persisting a new avatar — the
+// user still confirms with "Use this icon").
+function _randomizeBuilder() {
+  for (const part of AVATAR_BUILDER.parts) {
+    _builderSel[part.key] = 1 + Math.floor(Math.random() * part.count);
+    const num = document.querySelector(`.builder-row[data-key="${part.key}"] .builder-num`);
+    if (num) num.textContent = _builderSel[part.key];
+  }
+  _builderBg = AVATAR_BG_SWATCHES[Math.floor(Math.random() * AVATAR_BG_SWATCHES.length)];
+  document.querySelectorAll('.builder-swatch[data-color]').forEach(el => {
+    el.classList.toggle('selected', el.dataset.color === _builderBg);
+  });
+  const inp = document.getElementById('builderBgInput');
+  if (inp) inp.value = _builderBg;
+  _saveBuilderState();
+  _renderBuilderPreview();
+}
+
+function _setBg(color) {
+  if (!/^#[0-9a-f]{6}$/i.test(color)) return;
+  _builderBg = color.toLowerCase();
+  document.querySelectorAll('.builder-swatch[data-color]').forEach(el => {
+    el.classList.toggle('selected', el.dataset.color === _builderBg);
+  });
+  _saveBuilderState();
+  _renderBuilderPreview();
+}
+
+async function _saveBuiltAvatar() {
+  const btn = document.getElementById('builderSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  await _selectAvatar(_builderRecipe());
+  if (btn) {
+    btn.textContent = 'Saved ✓';
+    setTimeout(() => { btn.disabled = false; btn.textContent = 'Use this icon'; }, 1500);
+  }
+}
+
 // ── AVATAR ACTIONS ───────────────────────────────────────────────────────────
 
 // Click-to-save: optimistically updates the picker + nav, persists in the
@@ -266,18 +434,21 @@ async function _selectAvatar(value) {
   document.querySelectorAll('#avatarPicker .avatar-option').forEach(el => {
     el.classList.toggle('selected', el.dataset.value === value);
   });
-  document.getElementById('acctAvatarPreview').src = value;
+  _renderAcctPreview();
   _syncRemoveBtn();
   clearError('avatarErr');
   _updateAuthUI();
 
+  const profile = getCurrentProfile();
+  if (profile) profile.avatar_url = value;
   const { error } = await db.from('profiles').update({ avatar_url: value }).eq('id', user.id);
   if (error) {
     _acctAvatar = previous;
+    if (profile) profile.avatar_url = previous;
     document.querySelectorAll('#avatarPicker .avatar-option').forEach(el => {
       el.classList.toggle('selected', el.dataset.value === (previous ?? ''));
     });
-    document.getElementById('acctAvatarPreview').src = previous || _acctFallback;
+    _renderAcctPreview();
     _syncRemoveBtn();
     _updateAuthUI();
     showError('avatarErr', error.message);
@@ -338,8 +509,10 @@ async function _doRemoveAvatar() {
   }
 
   _acctAvatar = null;
+  const profile = getCurrentProfile();
+  if (profile) profile.avatar_url = null;
   document.querySelectorAll('#avatarPicker .avatar-option').forEach(el => el.classList.remove('selected'));
-  document.getElementById('acctAvatarPreview').src = _acctFallback;
+  _renderAcctPreview();
   _updateAuthUI();
   btn.textContent = 'Done!';
   // Stay disabled. Re're already on the default now. Rut rename back after the flash.
