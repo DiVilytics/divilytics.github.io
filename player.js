@@ -260,6 +260,7 @@ function render() {
       getHref:     key => `characters.html?char=${encodeURIComponent(key)}`,
       getIdentity: key => charImgHTML(key),
       getSub:      key => pfCharBoxMap[key],
+      getSubHref:  key => pfCharBoxMap[key] ? `characters.html?box=${boxAnchorId(pfCharBoxMap[key])}` : '',
       wrapClass:   'mb-1-25',
     })}
 

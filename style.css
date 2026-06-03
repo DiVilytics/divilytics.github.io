@@ -267,6 +267,7 @@ a.chip {
 .pf-name-block { display: flex; flex-direction: column; gap: 1px; }
 .pf-nick { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
 .pf-since { font-size: 12px; font-weight: 400; color: var(--dim); letter-spacing: 0; }
+.pf-since-link { color: inherit; text-decoration: none; cursor: pointer; }
 
 .char-objective {
   margin: 10px 0 0;
@@ -1065,6 +1066,7 @@ select:disabled {
 .row-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-name .char-portrait { margin-right: 5px; }
 .row-sub  { font-size: 11px; color: var(--dim); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-sub-link { cursor: pointer; }
 
 .row-identity { display: flex; align-items: center; gap: 8px; overflow: hidden; min-width: 0; }
 .row-identity > div { overflow: hidden; min-width: 0; }
@@ -2020,7 +2022,7 @@ select:disabled {
   .cs-mini-row:hover { background: var(--s2); }
 }
 
-.char-roster-group { margin-bottom: 1.5rem; }
+.char-roster-group { margin-bottom: 1.5rem; scroll-margin-top: 70px; }
 
 .char-roster-group-name {
   font-size: 11px;
@@ -2432,6 +2434,10 @@ select:disabled {
   .chip-nick a.nick-link:hover              { text-decoration: underline; text-underline-offset: 2px; }
   .lb-row.link:hover                        { background: var(--s2); }
   .lb-row.link:hover .row-name              { text-decoration: underline; text-underline-offset: 2px; }
+  /* When hovering the box sub-label specifically, underline only it (not the name). */
+  .lb-row.link:has(.row-sub-link:hover) .row-name { text-decoration: none; }
+  .row-sub-link:hover                       { text-decoration: underline; text-underline-offset: 2px; color: var(--muted); }
+  .pf-since-link:hover                      { text-decoration: underline; text-underline-offset: 2px; color: var(--muted); }
   .lb-row:hover                             { background: var(--s2); }
   .pf-identity:hover                        { opacity: 1; }
   .live-btn:hover                           { background: var(--s3); border-color: var(--s4); }

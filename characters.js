@@ -193,12 +193,13 @@ async function init() {
   setActiveNav('characters.html');
   await initAuth();
 
-  const charName = (new URLSearchParams(location.search).get('char') || '').trim();
-  if (!charName) await renderRosterPage();
+  const params   = new URLSearchParams(location.search);
+  const charName = (params.get('char') || '').trim();
+  if (!charName) await renderRosterPage((params.get('box') || '').trim());
   else           await renderDetailPage(charName);
 }
 
-async function renderRosterPage() {
+async function renderRosterPage(scrollBox) {
   document.title = 'DiVilytics | Characters';
 
   csAllChars = await loadCharacters();
@@ -211,7 +212,7 @@ async function renderRosterPage() {
   root.innerHTML =
     `<div id="csSummary"></div>` +
     Object.entries(byBox).map(([box, chars]) => `
-      <div class="char-roster-group">
+      <div class="char-roster-group" id="${boxAnchorId(box)}">
         <div class="char-roster-group-name">${_esc(box)}</div>
         <div class="char-roster">${
           chars.map(c => `
@@ -221,7 +222,13 @@ async function renderRosterPage() {
             </a>`).join('')
         }</div>
       </div>`).join('');
-  _renderMonthlyReport();
+
+  // Wait for the monthly report (it fills #csSummary above the groups and
+  // changes layout) before scrolling, so a ?box= jump lands at the right spot.
+  await _renderMonthlyReport();
+  if (scrollBox) {
+    requestAnimationFrame(() => document.getElementById(scrollBox)?.scrollIntoView({ block: 'start' }));
+  }
 }
 
 function _showCsEmpty(html) {
@@ -268,7 +275,7 @@ async function _renderCharIdentity() {
   const objective  = objectives[csChar.name];
   const paceDot    = csChar.pace ? `<span class="pace-dot ${csChar.pace}" title="${_esc(csChar.pace)}"></span>` : '';
   document.getElementById('csIdentity').innerHTML =
-    `<div class="pf-identity"><img class="char-portrait identity-portrait zoomable" src="${charImgSrc(csChar.name)}" alt="" onerror="this.src='asset/players/default.svg'" onclick="showAvatarLightbox(this.src, 'asset/players/default.svg')"><span class="pf-name-block"><span class="pf-nick">${_esc(csChar.name)}</span><span class="pf-since">${_esc(csChar.box)}</span></span></div>${objective ? `<p class="char-objective">${paceDot}${_esc(objective)}</p>` : ''}`;
+    `<div class="pf-identity"><img class="char-portrait identity-portrait zoomable" src="${charImgSrc(csChar.name)}" alt="" onerror="this.src='asset/players/default.svg'" onclick="showAvatarLightbox(this.src, 'asset/players/default.svg')"><span class="pf-name-block"><span class="pf-nick">${_esc(csChar.name)}</span>${csChar.box ? `<a class="pf-since pf-since-link" href="characters.html?box=${boxAnchorId(csChar.box)}" title="View ${_esc(csChar.box)} characters">${_esc(csChar.box)}</a>` : ''}</span></div>${objective ? `<p class="char-objective">${paceDot}${_esc(objective)}</p>` : ''}`;
 }
 
 function _foldBuckets(buckets) {

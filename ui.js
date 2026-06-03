@@ -485,8 +485,27 @@ function statBarWidth(r, mode, maxWins, maxGames, maxPct) {
 //   getIdentity(key): returns the inline HTML for the row's avatar/portrait
 //   getSub(key)   : optional, returns small grey sub-text under the name
 //   wrapClass     : optional extra class on the `lb-table` wrapper
+// Anchor id for a character's box group on the characters roster page.
+function boxAnchorId(box) {
+  return 'box-' + String(box || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+// A stat-table row is itself a link (to the character/player). The box
+// sub-label inside it is a *separate* link (to that box on the characters
+// page). Intercept its click in the capture phase — before the row's anchor
+// navigation — and route to the box instead.
+document.addEventListener('click', function (e) {
+  const sub = e.target.closest && e.target.closest('.row-sub-link');
+  if (!sub) return;
+  const href = sub.getAttribute('data-href');
+  if (!href) return;
+  e.preventDefault();
+  e.stopPropagation();
+  location.href = href;
+}, true);
+
 function renderStatTableHTML(rows, opts) {
-  const { mode, headLabel, getKey, getHref, getIdentity, getSub, wrapClass = '' } = opts;
+  const { mode, headLabel, getKey, getHref, getIdentity, getSub, getSubHref, wrapClass = '' } = opts;
   const sorted = sortStatRows(rows, mode);
 
   const maxWins  = sorted[0]?.wins  || 1;
@@ -513,6 +532,7 @@ function renderStatTableHTML(rows, opts) {
         const dispVal = mode === 'count' ? r.wins : mode === 'pct' ? Math.round(pct * 100) + '%' : r.games;
         const dispSub = mode === 'games' ? r.wins : r.games;
         const sub     = getSub ? (getSub(key, r) || '') : '';
+        const subHref = (sub && getSubHref) ? (getSubHref(key, r) || '') : '';
         return `
           <a class="lb-row link" href="${getHref(key, r)}">
             <div class="rank-num ${medalClass(rank)}">${rank}</div>
@@ -520,7 +540,9 @@ function renderStatTableHTML(rows, opts) {
               ${getIdentity(key, r)}
               <div>
                 <div class="row-name">${_esc(key)}</div>
-                ${sub ? `<div class="row-sub">${_esc(sub)}</div>` : ''}
+                ${sub ? (subHref
+                  ? `<div class="row-sub row-sub-link" role="link" tabindex="0" title="View ${_esc(sub)} characters" data-href="${_esc(subHref)}">${_esc(sub)}</div>`
+                  : `<div class="row-sub">${_esc(sub)}</div>`) : ''}
               </div>
             </div>
             <div class="bar-cell">

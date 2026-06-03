@@ -119,6 +119,7 @@ function render({ rows, summary }) {
         : `player.html?nick=${encodeURIComponent(key)}`,
       getIdentity: key => isChar ? charImgHTML(key) : playerAvatarHTML(lbNickAvatarMap[key]),
       getSub:      key => isChar ? lbCharBoxMap[key] : '',
+      getSubHref:  key => (isChar && lbCharBoxMap[key]) ? `characters.html?box=${boxAnchorId(lbCharBoxMap[key])}` : '',
     })}`;
 }
 
