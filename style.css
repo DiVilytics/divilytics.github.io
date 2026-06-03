@@ -2431,6 +2431,7 @@ select:disabled {
   .chip-char a.char-link:hover              { text-decoration: underline; text-underline-offset: 2px; }
   .chip-nick a.nick-link:hover              { text-decoration: underline; text-underline-offset: 2px; }
   .lb-row.link:hover                        { background: var(--s2); }
+  .lb-row.link:hover .row-name              { text-decoration: underline; text-underline-offset: 2px; }
   .lb-row:hover                             { background: var(--s2); }
   .pf-identity:hover                        { opacity: 1; }
   .live-btn:hover                           { background: var(--s3); border-color: var(--s4); }
