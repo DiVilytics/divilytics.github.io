@@ -85,7 +85,10 @@
       <div class="err" id="editDetailsErr"></div>
       <div class="field">
         <label>Location <span class="optional"></span></label>
-        <input type="text" id="editLocation" maxlength="60" placeholder="optional">
+        <div class="ac-wrap">
+          <input type="text" id="editLocation" maxlength="60" placeholder="optional" autocomplete="off">
+          <div class="cs-dropdown" id="editLocationDropdown"></div>
+        </div>
       </div>
       <div class="form-row">
         <div class="field">

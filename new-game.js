@@ -51,6 +51,7 @@ async function init() {
   _updateOwnedToggleUI();
   _initDrag();
   _checkResume();
+  attachLocationAutocomplete('fLocation', 'fLocationDropdown');
 }
 
 async function _loadOwnedBoxes() {

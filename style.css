@@ -2074,6 +2074,9 @@ select:disabled {
 }
 .cs-search input { font-size: 13px; padding: 7px 10px; }
 
+/* Wrapper that anchors a .cs-dropdown to a full-width form input. */
+.ac-wrap { position: relative; }
+
 .cs-dropdown {
   position: absolute;
   top: calc(100% + 4px);

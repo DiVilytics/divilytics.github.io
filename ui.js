@@ -702,6 +702,25 @@ function dbSearchSource(buildQuery) {
   };
 }
 
+// Attach location autocomplete to a free-text input: typing suggests existing
+// locations (via the search_locations RPC); picking one fills the input. The
+// user can still type a brand-new location. Requires a sibling .cs-dropdown
+// inside a position:relative wrapper.
+function attachLocationAutocomplete(inputId, dropdownId) {
+  attachSearchBox({
+    inputId,
+    dropdownId,
+    debounceMs: 200,
+    fetchOptions: dbSearchSource(q => db.rpc('search_locations', { q })),
+    renderOption: l => `<div class="cs-option" data-loc="${_esc(l)}">${_esc(l)}</div>`,
+    onSelect: opt => {
+      const input = document.getElementById(inputId);
+      if (input) input.value = opt.dataset.loc;
+      document.getElementById(dropdownId)?.classList.remove('open');
+    },
+  });
+}
+
 function attachSearchBox(opts) {
   const {
     inputId, dropdownId,

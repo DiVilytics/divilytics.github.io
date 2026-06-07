@@ -8,6 +8,7 @@ let claimPlayers = [];
 async function init() {
   setActiveNav('');
   await initAuth(() => render());
+  attachLocationAutocomplete('editLocation', 'editLocationDropdown');
 
   const params = new URLSearchParams(location.search);
   const gameId = params.get('game');
