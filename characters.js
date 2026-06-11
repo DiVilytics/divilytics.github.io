@@ -13,7 +13,7 @@ let csReportMonth = (() => {
 async function _loadMonthCharacterStats(monthStart) {
   const start = new Date(monthStart.getFullYear(), monthStart.getMonth(),     1);
   const end   = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
-  const label = start.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const label = start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const { data: games } = await db
     .from('games')
@@ -124,7 +124,7 @@ async function _renderMonthlyReport() {
   const host = document.getElementById('csSummary');
   if (!host) return;
 
-  const label = csReportMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const label = csReportMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const token = ++_csLoadToken;
 
   // On a month change the cards already exist — keep them in place (dimmed) and

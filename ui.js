@@ -509,19 +509,6 @@ function boxAnchorId(box) {
   return 'box-' + String(box || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
-// A stat-table row is itself a link (to the character/player). The box
-// sub-label inside it is a *separate* link (to that box on the characters
-// page). Intercept its click in the capture phase — before the row's anchor
-// navigation — and route to the box instead.
-document.addEventListener('click', function (e) {
-  const sub = e.target.closest && e.target.closest('.row-sub-link');
-  if (!sub) return;
-  const href = sub.getAttribute('data-href');
-  if (!href) return;
-  e.preventDefault();
-  e.stopPropagation();
-  location.href = href;
-}, true);
 
 // `limit`   — render only the top N rows (default: all).
 // `selfKey` — highlight the row whose key matches; if that row falls beyond
@@ -549,15 +536,17 @@ function renderStatTableHTML(rows, opts) {
     const sub     = getSub ? (getSub(key, r) || '') : '';
     const subHref = (sub && getSubHref) ? (getSubHref(key, r) || '') : '';
     const selfCls = (selfKey != null && key === selfKey) ? ' lb-row-self' : '';
+    // The name and the box are each their own link (to the character/player and to
+    // the box), rather than one row-wide anchor — so each is independently clickable.
     return `
-      <a class="lb-row link${selfCls}" href="${getHref(key, r)}">
+      <div class="lb-row${selfCls}">
         <div class="rank-num ${medalClass(rank)}">${rank}</div>
         <div class="row-identity">
           ${getIdentity(key, r)}
-          <div>
-            <div class="row-name">${_esc(key)}</div>
+          <div class="row-id-text">
+            <a class="row-name row-name-link" href="${getHref(key, r)}">${_esc(key)}</a>
             ${sub ? (subHref
-              ? `<div class="row-sub row-sub-link" role="link" tabindex="0" title="View ${_esc(sub)} characters" data-href="${_esc(subHref)}">${_esc(sub)}</div>`
+              ? `<a class="row-sub row-sub-link" href="${_esc(subHref)}" title="View ${_esc(sub)} characters">${_esc(sub)}</a>`
               : `<div class="row-sub">${_esc(sub)}</div>`) : ''}
           </div>
         </div>
@@ -568,7 +557,7 @@ function renderStatTableHTML(rows, opts) {
         </div>
         <div class="row-val">${dispVal}</div>
         <div class="row-games">${dispSub}</div>
-      </a>`;
+      </div>`;
   };
 
   let body = sorted.slice(0, limit).map((r, i) => rowHTML(r, i)).join('');
