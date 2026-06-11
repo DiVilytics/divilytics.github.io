@@ -7,6 +7,9 @@ let lbTab    = 'characters';   // 'characters' | 'players'
 let lbMode   = 'pct';          // 'pct' | 'count' | 'games'
 let lbFilter = 'all';          // 'all' | 2 | 3 | 4 | 5 | 6
 
+const LB_PAGE_SIZE = 100;
+let lbDisplayLimit = LB_PAGE_SIZE;
+
 // Cache: key `${lbTab}:${lbFilter}` → { rows, summary }
 // Avoids re-fetching when only the sort lbMode changes.
 const _lbCache = {};
@@ -34,6 +37,7 @@ async function init() {
 
 function setTab(t) {
   lbTab = t;
+  lbDisplayLimit = LB_PAGE_SIZE;
   document.getElementById('tabChars').classList.toggle('on',   t === 'characters');
   document.getElementById('tabPlayers').classList.toggle('on', t === 'players');
   loadAndRender();
@@ -47,8 +51,15 @@ function setMode(m) {
 
 function setFilter(f) {
   lbFilter = f;
+  lbDisplayLimit = LB_PAGE_SIZE;
   updateFilterPills('#filterPills .pill', f);
   loadAndRender();
+}
+
+function lbLoadMore() {
+  lbDisplayLimit += LB_PAGE_SIZE;
+  const cached = _lbCache[`${lbTab}:${lbFilter}`];
+  if (cached) render(cached);
 }
 
 // ── DATA LOADING ──────────────────────────────────────────────────────────────
@@ -90,8 +101,8 @@ function render({ rows, summary }) {
 
   document.getElementById('summary').innerHTML = statBoxesHTML([
     { val: games,                                  lbl: 'Games' },
-    { val: avgDur   != null ? avgDur + 'm' : '|',  lbl: 'Avg duration' },
-    { val: avgTurns != null ? avgTurns      : '|', lbl: 'Avg rounds' },
+    { val: avgDur   != null ? avgDur + 'm' : '-',  lbl: 'Avg duration' },
+    { val: avgTurns != null ? avgTurns      : '-', lbl: 'Avg rounds' },
   ]);
 
   if (!rows.length) {
@@ -100,7 +111,10 @@ function render({ rows, summary }) {
     return;
   }
 
-  const isChar = lbTab === 'characters';
+  const isChar  = lbTab === 'characters';
+  // Only the Players tab has a "you" to highlight.
+  const selfKey = isChar ? null : (getCurrentProfile()?.nickname || null);
+  const hasMore = rows.length > lbDisplayLimit;
 
   document.getElementById('lb').innerHTML = `
     <div class="controls mb-1">
@@ -113,6 +127,8 @@ function render({ rows, summary }) {
     ${renderStatTableHTML(rows, {
       mode:        lbMode,
       headLabel:   isChar ? 'Character' : 'Player',
+      limit:       lbDisplayLimit,
+      selfKey,
       getKey:      r   => isChar ? r.character : r.nickname,
       getHref:     key => isChar
         ? `characters.html?char=${encodeURIComponent(key)}`
@@ -120,7 +136,8 @@ function render({ rows, summary }) {
       getIdentity: key => isChar ? charImgHTML(key) : playerAvatarHTML(lbNickAvatarMap[key]),
       getSub:      key => isChar ? lbCharBoxMap[key] : '',
       getSubHref:  key => (isChar && lbCharBoxMap[key]) ? `characters.html?box=${boxAnchorId(lbCharBoxMap[key])}` : '',
-    })}`;
+    })}
+    ${hasMore ? `<button class="btn-load-more" onclick="lbLoadMore()">Load more</button>` : ''}`;
 }
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────

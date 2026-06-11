@@ -73,7 +73,10 @@ async function init() {
     document.getElementById('pfControls').insertAdjacentElement('beforebegin', identityEl);
   }
   identityEl.innerHTML =
-    `<span class="pf-identity">${avatarHTML(pfAvatarUrl, { cls: 'player-avatar-lg', extraClass: 'zoomable', id: 'pfAvatar', lightbox: true })}${nameBlock}</span>`;
+    `<div class="pf-identity-row">
+      <span class="pf-identity">${avatarHTML(pfAvatarUrl, { cls: 'player-avatar-lg', extraClass: 'zoomable', id: 'pfAvatar', lightbox: true })}${nameBlock}</span>
+      <button class="btn btn-ghost btn-sm pf-share-btn" onclick="showProfileQR()">Share</button>
+    </div>`;
 
   await load();
 }
@@ -221,6 +224,9 @@ function render() {
   const nGames = mine.length;
   const winPct = nGames ? Math.round((wins / nGames) * 100) : 0;
 
+  const avgDur   = avg(games.map(g => g.duration_minutes));
+  const avgTurns = avg(games.map(g => g.num_turns));
+
   if (!nGames) {
     root.innerHTML =
       `<div class="empty"><div class="empty-icon">🔍</div><h3>No games for this filter</h3><p>Try adjusting the player count.</p></div>`;
@@ -239,9 +245,11 @@ function render() {
   root.innerHTML = `
     <div class="summary">
       ${statBoxesHTML([
+        { val: nGames,       lbl: 'Games' },
+        { val: avgDur   != null ? Math.round(avgDur) + 'm' : '-', lbl: 'Avg duration' },
+        { val: avgTurns != null ? Math.round(avgTurns)     : '-', lbl: 'Avg rounds' },
         { val: winPct + '%', lbl: 'Win rate' },
         { val: wins,         lbl: 'Wins' },
-        { val: nGames,       lbl: 'Games' },
       ])}
     </div>
 
@@ -377,6 +385,19 @@ async function pfConfirmDeleteGame() {
   const { error } = await db.from('games').delete().eq('id', id);
   if (error) { alert(error.message); return; }
   await load();
+}
+
+// ── SHARE PROFILE QR ─────────────────────────────────────────────────────────
+
+function showProfileQR() {
+  if (!pfNick) return;
+  const title = document.getElementById('pfQrTitle');
+  if (title) title.textContent = `Share ${pfNick}`;
+  showQRModal(new URL(`player.html?nick=${encodeURIComponent(pfNick)}`, location.href).href, 'pfQrCode', 'pfQrOverlay');
+}
+
+function closeProfileQR() {
+  closeOverlay('pfQrOverlay');
 }
 
 // ── ACHIEVEMENT DETAIL ────────────────────────────────────────────────────────

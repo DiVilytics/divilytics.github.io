@@ -72,10 +72,6 @@
 .mb-1            { margin-bottom: 1rem; }
 .mb-1-25         { margin-bottom: 1.25rem; }
 .mt-1-5          { margin-top: 1.5rem; }
-/* Actions row directly under the account stats card. Negative top margin
-   absorbs the summary's bottom margin so the link/share buttons read as
-   part of the stats group, not as a separate section. */
-.acct-stats-actions { margin-top: -10px; margin-bottom: 1.25rem; }
 
 /* Modal/sheet body intro paragraph (replaces inline font/color/margin styles). */
 .modal-hint {
@@ -263,6 +259,14 @@ a.chip {
   border-radius: var(--rs);
   transition: opacity 0.15s;
 }
+
+.pf-identity-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pf-share-btn { flex: none; }
 
 .pf-name-block { display: flex; flex-direction: column; gap: 1px; }
 .pf-nick { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
@@ -453,8 +457,9 @@ main {
 .filter-char-toggle {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 9px 12px;
+  gap: 6px;
+  padding: 5px 10px;
+  height: 30px;
   background: var(--s1);
   border: 1px solid var(--border);
   border-radius: var(--rs);
@@ -463,9 +468,10 @@ main {
   transition: background 0.15s;
   font-family: inherit;
   color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
-  width: 100%;
+  font-size: 12px;
+  font-weight: 600;
+  width: auto;
+  align-self: flex-start;
 }
 .filter-char-toggle .toggle-right { display: flex; align-items: center; gap: 8px; }
 
@@ -486,11 +492,10 @@ main {
 .filter-char-panel {
   background: var(--s1);
   border: 1px solid var(--border);
-  border-top: none;
-  border-radius: 0 0 var(--rs) var(--rs);
+  border-radius: var(--rs);
   padding: 12px;
   display: none;
-  margin-top: -8px;
+  margin-top: -2px;   /* filter-bar's 8px gap → ~6px, matching new-game */
 }
 .filter-char-panel.open { display: block; }
 
@@ -501,6 +506,7 @@ main {
   align-items: center;
 }
 .filter-apply-btn { margin-left: auto; }
+.gl-filter-hint { font-size: 11px; color: var(--dim); margin: 0 0 8px; }
 .txt-btn {
   font-family: inherit;
   font-size: 12px;
@@ -883,11 +889,16 @@ select optgroup { background: #1a1a1a; color: var(--muted); font-style: normal; 
   color: var(--dim);
   font-size: 9px;
   margin-left: 10px;
-  margin-right: auto;
+  /* Take the row's free width so _layoutLegend() can measure how much fits and
+     split the legend into balanced rows. */
+  flex: 1 1 auto;
+  min-width: 0;
 }
-/* Keep each "symbol = meaning" pair on one line; only allow wrapping at the
-   " | " separators between pairs. */
+/* Each "symbol = meaning" pair stays on one line; _layoutLegend() groups pairs
+   into balanced .legend-row lines, with separators only between pairs on a row. */
+.players-legend .legend-row  { display: block; }
 .players-legend .legend-item { white-space: nowrap; }
+.players-legend .legend-sep  { white-space: pre; }
 
 .row-num { font-size: 12px; color: var(--dim); width: 16px; text-align: right; flex-shrink: 0; margin-right: 8px; }
 .drag-handle {
@@ -1057,6 +1068,24 @@ select:disabled {
   transition: background 0.12s;
 }
 .lb-row:last-child { border-bottom: none; }
+
+/* The viewer's own row, highlighted wherever it appears (top list or pinned). */
+.lb-row-self {
+  background: var(--accent-d);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+/* "Your position" divider shown above a pinned self-row that ranks below the cut. */
+.lb-row-sep {
+  padding: 6px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
 
 .rank-num { font-size: 12px; font-weight: 700; color: var(--dim); }
 .rank-num.gold   { color: var(--gold); }
@@ -1239,12 +1268,16 @@ select:disabled {
   display: flex;
   justify-content: center;
 }
+/* In the Presets pane the preview sits above the grid (no flex-gap parent), so
+   give it its own spacing. */
+#photosPreview { margin-bottom: 14px; }
 .builder-preview-av {
   width: 140px;
   height: 140px;
   border-radius: 50%;
   border: 1px solid var(--border);
   background: var(--s2);
+  object-fit: cover;   /* crop preset photos to the circle (ignored by composites) */
 }
 .builder-controls {
   width: 100%;
@@ -1590,7 +1623,12 @@ select:disabled {
 .pace-color.orange { background: #fb923c; }
 .pace-color.red    { background: #e05454; }
 .pace-color:hover  { transform: scale(1.08); }
-.pace-color.on     { border-color: var(--text); box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px currentColor; }
+/* Selection states. "primary" is the clicked colour — full colour + the black
+   ring (2px border + 1px box-shadow, which Firefox renders evenly, unlike a 3px
+   border). Pace+ neighbours render at full colour with no ring (no rule needed).
+   Colours outside the selection stay coloured but fade back. */
+.pace-color.sel-primary { border-color: var(--text); box-shadow: 0 0 0 1px var(--text); }
+.pace-color.sel-out     { opacity: 0.2; }
 
 /* Inline variant — sits in the same row as the mode select */
 .exclude-toggle.exclude-toggle-inline {
@@ -1602,37 +1640,30 @@ select:disabled {
   flex-shrink: 0;
   gap: 6px;
 }
-.draw-mode-actions {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
 .exclude-toggle.exclude-toggle-inline .toggle-right { gap: 6px; }
-.owned-toggle.on {
-  background: var(--accent-d);
-  color: var(--accent);
-  border-color: var(--accent);
-}
+.draw-mode-actions { display: flex; gap: 8px; margin-left: auto; flex-shrink: 0; }
 .owned-toggle.disabled { opacity: 0.45; }
 .exclude-toggle-inline ~ .exclude-body,
 .draw-mode-row + .exclude-body {
   border-top: 1px solid var(--border);
   border-radius: var(--rs);
-  margin-top: 8px;
+  margin-top: 0;
 }
+/* When the panel is open, tuck it close under the toggle row (like the game-log
+   filter panel) instead of leaving the row's full bottom margin. */
+.draw-mode-row:has(+ .exclude-body.open) { margin-bottom: 6px; }
 
-.exclude-body.locked .filter-actions,
-.exclude-body.locked #excludeGrid {
-  pointer-events: none;
-  opacity: 0.55;
+/* Pace/Mine selection row inside the filter: "Pace:" swatches, the Pace+
+   modifier, and "Mine". */
+.filter-bulk-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
 }
-.exclude-locked-hint {
-  font-size: 12px;
-  color: var(--muted);
-  font-style: italic;
-  margin-bottom: 8px;
-}
+.filter-bulk-row .seg-btn { padding: 4px 10px; }
+.owned-toggle.on { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 
 /* ── PLAYER SLOTS ─────────────────────────────────────────────────── */
 #orderSlots { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
@@ -1758,13 +1789,24 @@ select:disabled {
 .box-group { margin-bottom: 10px; }
 .box-group:last-child { margin-bottom: 0; }
 .box-name {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
   font-size: 10px;
   font-weight: 600;
   color: var(--dim);
   text-transform: uppercase;
   letter-spacing: 0.07em;
   margin-bottom: 5px;
+  cursor: pointer;
+  transition: color 0.12s;
 }
+.box-name:hover { color: var(--text); }
 .box-pills { display: flex; flex-wrap: wrap; gap: 5px; }
 
 .char-pill {
@@ -1969,6 +2011,16 @@ select:disabled {
   gap: 6px;
   margin-bottom: 1.25rem;
 }
+/* First-load skeleton: a placeholder row that mirrors a real .cs-mini-row so the
+   card is the right height before data arrives (no layout jump). */
+.cs-skel-dot { width: 28px; height: 28px; border-radius: 50%; background: var(--s3); flex: none; }
+.cs-skel-bar { height: 12px; width: 34px; border-radius: 4px; background: var(--s3); margin-left: auto; }
+.cs-skel { pointer-events: none; }
+.cs-skel .cs-skel-dot, .cs-skel .cs-skel-bar { animation: csSkelPulse 1.2s ease-in-out infinite; }
+@keyframes csSkelPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+/* While a new month loads, the existing cards stay put but dim for feedback. */
+.cs-report-loading .cs-summary { opacity: 0.45; transition: opacity 0.1s; }
+.cs-summary-empty { color: var(--muted); font-size: 13px; padding: 14px 2px; margin-bottom: 1.25rem; }
 .cs-summary-card {
   background: var(--s1);
   border: 1px solid var(--border);
@@ -2283,18 +2335,9 @@ select:disabled {
 
 /* ── ACCOUNT PAGE ────────────────────────────────────────────────── */
 
-.acct-identity {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 20px 0;
-}
-
-.acct-nick {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text);
-}
+/* Page title with a username (e.g. "Account | Ada"). .acct-title wraps the whole
+   thing as a single flex child so the h2's gap doesn't add stray spacing around
+   the pipe. Everything inherits the h2's text colour. */
 
 .acct-section {
   padding: 18px 0;
@@ -2473,11 +2516,8 @@ select:disabled {
    ────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .draw-mode-row                  { gap: 6px; }
-  .draw-mode-row .pace-colors     { gap: 3px; }
-  .draw-mode-row .pace-color      { width: 20px; height: 20px; border-width: 1px; }
-  .draw-mode-row .pace-color.on   { box-shadow: 0 0 0 1px var(--bg), 0 0 0 3px currentColor; }
-  .draw-mode-row .draw-mode-select { padding-right: 22px; }
-  .draw-mode-row .draw-mode-actions { gap: 6px; }
+  .filter-bulk-row .pace-colors   { gap: 3px; }
+  .filter-bulk-row .pace-color    { width: 24px; height: 24px; border-width: 1px; }
 }
 
 @media (max-width: 480px) {
@@ -2486,7 +2526,7 @@ select:disabled {
   .lb-head, .lb-row                     { grid-template-columns: 24px 1fr 52px 52px 44px; }
   .cs-table .lb-head, .cs-table .lb-row { grid-template-columns: 68px 1fr 56px 44px; }
   .form-row input { font-size: 13px; }
-  .draw-mode-row .pace-color      { width: 18px; height: 18px; }
+  .filter-bulk-row .pace-color    { width: 22px; height: 22px; }
   /* Tighter box picker: lets 3 columns fit instead of 2, keeping cover art
      a comfortable size on phones. */
   .box-picker { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
@@ -2495,10 +2535,8 @@ select:disabled {
 @media (max-width: 360px) {
   .nav-links a { padding: 5px 8px; font-size: 12px; }
   .draw-mode-row                  { gap: 4px; }
-  .draw-mode-row .pace-colors     { gap: 2px; }
-  .draw-mode-row .pace-color      { width: 14px; height: 14px; }
-  .draw-mode-row .draw-mode-actions { gap: 4px; }
-  .draw-mode-row .draw-mode-select,
+  .filter-bulk-row .pace-colors   { gap: 2px; }
+  .filter-bulk-row .pace-color    { width: 20px; height: 20px; }
   .draw-mode-row .exclude-toggle.exclude-toggle-inline { padding: 5px 6px; font-size: 11px; }
   .box-picker { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
 }

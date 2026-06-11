@@ -259,26 +259,45 @@ function charSelectHTML(chars, selected = '') {
 function buildCharPillGrid(container, chars, set, { activeClass = 'on', onToggle } = {}) {
   const byBox = groupByBox(chars);
   container.innerHTML = '';
+
+  // The pill's own class is the source of truth for "is this active": some
+  // callers (new-game) reassign their backing set on every recompute, so a
+  // captured set reference can go stale — the DOM class never does. We still
+  // mutate `set` and fire `onToggle` so the caller's real state stays in sync.
+  const isActive = btn => btn.classList.contains(activeClass);
+  const setChar = (name, btn, active) => {
+    if (active === isActive(btn)) return;
+    btn.classList.toggle(activeClass, active);
+    if (active) set.add(name); else set.delete(name);
+    onToggle?.(name, active);
+  };
+
   for (const [box, cs] of Object.entries(byBox)) {
     const group = document.createElement('div');
     group.className = 'box-group';
-    group.innerHTML = `<div class="box-name">${box}</div><div class="box-pills"></div>`;
+    group.innerHTML = `<button type="button" class="box-name" title="Toggle all ${_esc(box)} characters">${_esc(box)}</button><div class="box-pills"></div>`;
     container.appendChild(group);
     const pillsEl = group.querySelector('.box-pills');
+
+    const boxBtns = [];
     for (const c of cs) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'char-pill' + (set.has(c.name) ? ` ${activeClass}` : '');
       btn.innerHTML = charImgHTML(c.name) + _esc(c.name);
       btn.dataset.name = c.name;
-      btn.onclick = () => {
-        const wasOn = set.has(c.name);
-        if (wasOn) { set.delete(c.name); btn.classList.remove(activeClass); }
-        else       { set.add(c.name);    btn.classList.add(activeClass);    }
-        onToggle?.(c.name, !wasOn);
-      };
+      btn.onclick = () => setChar(c.name, btn, !isActive(btn));
+      boxBtns.push({ name: c.name, btn });
       pillsEl.appendChild(btn);
     }
+
+    // Box header toggles every character in this box at once: if all are already
+    // active, clear them; otherwise activate them all. Only touches this box's
+    // characters, so selections elsewhere are preserved.
+    group.querySelector('.box-name').onclick = () => {
+      const allOn = boxBtns.every(({ btn }) => isActive(btn));
+      boxBtns.forEach(({ name, btn }) => setChar(name, btn, !allOn));
+    };
   }
 }
 
@@ -504,8 +523,13 @@ document.addEventListener('click', function (e) {
   location.href = href;
 }, true);
 
+// `limit`   — render only the top N rows (default: all).
+// `selfKey` — highlight the row whose key matches; if that row falls beyond
+//             `limit`, pin it at the bottom under a "Your position" divider so
+//             the viewer always sees their standing for the current sort mode.
 function renderStatTableHTML(rows, opts) {
-  const { mode, headLabel, getKey, getHref, getIdentity, getSub, getSubHref, wrapClass = '' } = opts;
+  const { mode, headLabel, getKey, getHref, getIdentity, getSub, getSubHref,
+          wrapClass = '', limit = Infinity, selfKey = null } = opts;
   const sorted = sortStatRows(rows, mode);
 
   const maxWins  = sorted[0]?.wins  || 1;
@@ -514,6 +538,46 @@ function renderStatTableHTML(rows, opts) {
 
   const ranks      = computeRanks(sorted, mode);
   const medalClass = rank => rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+
+  const rowHTML = (r, i) => {
+    const rank    = ranks[i];
+    const key     = getKey(r);
+    const pct     = r.games ? r.wins / r.games : 0;
+    const barW    = statBarWidth(r, mode, maxWins, maxGames, maxPct);
+    const dispVal = mode === 'count' ? r.wins : mode === 'pct' ? Math.round(pct * 100) + '%' : r.games;
+    const dispSub = mode === 'games' ? r.wins : r.games;
+    const sub     = getSub ? (getSub(key, r) || '') : '';
+    const subHref = (sub && getSubHref) ? (getSubHref(key, r) || '') : '';
+    const selfCls = (selfKey != null && key === selfKey) ? ' lb-row-self' : '';
+    return `
+      <a class="lb-row link${selfCls}" href="${getHref(key, r)}">
+        <div class="rank-num ${medalClass(rank)}">${rank}</div>
+        <div class="row-identity">
+          ${getIdentity(key, r)}
+          <div>
+            <div class="row-name">${_esc(key)}</div>
+            ${sub ? (subHref
+              ? `<div class="row-sub row-sub-link" role="link" tabindex="0" title="View ${_esc(sub)} characters" data-href="${_esc(subHref)}">${_esc(sub)}</div>`
+              : `<div class="row-sub">${_esc(sub)}</div>`) : ''}
+          </div>
+        </div>
+        <div class="bar-cell">
+          <div class="bar-bg">
+            <div class="bar-fill${rank === 1 ? ' gold' : ''}" style="width:${barW}%"></div>
+          </div>
+        </div>
+        <div class="row-val">${dispVal}</div>
+        <div class="row-games">${dispSub}</div>
+      </a>`;
+  };
+
+  let body = sorted.slice(0, limit).map((r, i) => rowHTML(r, i)).join('');
+
+  // Pin the viewer's row if it ranks below the visible cut.
+  const selfIdx = selfKey != null ? sorted.findIndex(r => getKey(r) === selfKey) : -1;
+  if (selfIdx >= limit) {
+    body += `<div class="lb-row-sep">Your position</div>${rowHTML(sorted[selfIdx], selfIdx)}`;
+  }
 
   return `
     <div class="lb-table${wrapClass ? ' ' + wrapClass : ''}">
@@ -524,36 +588,7 @@ function renderStatTableHTML(rows, opts) {
         <span class="text-right">${mode === 'count' ? '# Wins' : mode === 'pct' ? '% Wins' : '# Games'}</span>
         <span class="text-right">${mode === 'games' ? '# Wins' : '# Games'}</span>
       </div>
-      ${sorted.map((r, i) => {
-        const rank    = ranks[i];
-        const key     = getKey(r);
-        const pct     = r.games ? r.wins / r.games : 0;
-        const barW    = statBarWidth(r, mode, maxWins, maxGames, maxPct);
-        const dispVal = mode === 'count' ? r.wins : mode === 'pct' ? Math.round(pct * 100) + '%' : r.games;
-        const dispSub = mode === 'games' ? r.wins : r.games;
-        const sub     = getSub ? (getSub(key, r) || '') : '';
-        const subHref = (sub && getSubHref) ? (getSubHref(key, r) || '') : '';
-        return `
-          <a class="lb-row link" href="${getHref(key, r)}">
-            <div class="rank-num ${medalClass(rank)}">${rank}</div>
-            <div class="row-identity">
-              ${getIdentity(key, r)}
-              <div>
-                <div class="row-name">${_esc(key)}</div>
-                ${sub ? (subHref
-                  ? `<div class="row-sub row-sub-link" role="link" tabindex="0" title="View ${_esc(sub)} characters" data-href="${_esc(subHref)}">${_esc(sub)}</div>`
-                  : `<div class="row-sub">${_esc(sub)}</div>`) : ''}
-              </div>
-            </div>
-            <div class="bar-cell">
-              <div class="bar-bg">
-                <div class="bar-fill${rank === 1 ? ' gold' : ''}" style="width:${barW}%"></div>
-              </div>
-            </div>
-            <div class="row-val">${dispVal}</div>
-            <div class="row-games">${dispSub}</div>
-          </a>`;
-      }).join('')}
+      ${body}
     </div>`;
 }
 

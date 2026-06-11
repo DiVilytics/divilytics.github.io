@@ -41,7 +41,8 @@
 
 <main>
   <div class="page-header">
-    <h2>Account</h2>
+    <h2 id="acctTitle">Account</h2>
+    <button class="btn btn-ghost btn-sm" id="editNickBtn" onclick="changeNickname()">Edit nickname</button>
   </div>
 
   <div id="acctRoot" class="spinner">Loading…</div>
@@ -86,32 +87,7 @@
   </div>
 </div>
 
-<!-- QR Code sheet -->
-<div class="overlay" id="acctQrOverlay">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-header">
-      <h3>Share your profile</h3>
-      <button class="sheet-close" onclick="closeProfileQR()">×</button>
-    </div>
-    <div class="sheet-body">
-      <p class="modal-hint">Others can scan this to view your player profile.</p>
-      <div class="qr-wrap">
-        <div id="acctQrCode"></div>
-      </div>
-      <div class="qr-url-row">
-        <div class="qr-url" id="qrUrlText"></div>
-        <button class="pf-btn" onclick="copyQrUrl()" title="Copy link">⎘</button>
-      </div>
-    </div>
-    <div class="sheet-footer">
-      <button class="btn btn-primary" onclick="closeProfileQR()">Done</button>
-    </div>
-  </div>
-</div>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="config.js"></script>
 <script src="db.js"></script>
   <script src="ui.js"></script>

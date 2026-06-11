@@ -1,12 +1,11 @@
 // ── STATE ─────────────────────────────────────────────────────────────────────
 
 let chars            = [];
-let excluded         = new Set();   // currently excluded (manual ∪ auto-by-pace ∪ auto-by-ownership)
-let manualExcluded   = new Set();   // user-toggled exclusions, preserved across mode switches
-let drawMode         = 'random';    // 'random' | 'pace' | 'paceplus'
-let paceColor        = null;        // 'green' | 'yellow' | 'orange' | 'red' | null
+let excluded         = new Set();   // the draw-pool exclusion set — single source of truth
 let ownedBoxes       = new Set();   // boxes owned by the signed-in user
-let ownedOnly        = false;       // when true, exclude characters not in ownedBoxes
+let selectedPace     = null;        // 'green'|'yellow'|'orange'|'red'|null — single-select pace filter
+let pacePlus         = false;       // when on, a pace selection also includes the adjacent colours
+let mineOn           = false;       // sticky: limit the pool to characters in your boxes
 let orderSlots       = [];          // each: { id, char, isMe, isWinner }
 let orderNextId      = 0;
 let slotTimers       = {};          // slotId → setInterval id (active spin animation)
@@ -20,6 +19,8 @@ let _resumeTickId   = null;        // resume-banner ticker (set in _checkResume)
 
 const PACE_ORDER = ['green', 'yellow', 'orange', 'red'];
 
+const LEGEND_ITEMS = ['🎲 = draw', '👤 = you', '👑 = winner', '❌ = remove'];
+
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
 async function init() {
@@ -28,8 +29,7 @@ async function init() {
   // updates in-place after sign-in / sign-out.
   await initAuth(async () => {
     await _loadOwnedBoxes();
-    _updateOwnedToggleUI();
-    _recomputeExcluded();
+    _updatePaceUI();
     if (orderSlots.length) renderOrderSlots();
   });
   chars = await loadCharacters();
@@ -48,10 +48,13 @@ async function init() {
     addOrderSlot();
     addOrderSlot();
   }
-  _updateOwnedToggleUI();
+  _updatePaceUI();
+  updateExcludeUI();   // show the pool size from the start
   _initDrag();
   _checkResume();
   attachLocationAutocomplete('fLocation', 'fLocationDropdown');
+  _layoutLegend();
+  window.addEventListener('resize', _onLegendResize);
 }
 
 async function _loadOwnedBoxes() {
@@ -78,10 +81,10 @@ function _savePendingState() {
       fLocation:      document.getElementById('fLocation')?.value || '',
       fDur:           document.getElementById('fDur')?.value      || '',
       fTurns:         document.getElementById('fTurns')?.value    || '',
-      drawMode,
-      paceColor,
-      ownedOnly,
-      manualExcluded: [...manualExcluded],
+      excluded:       [...excluded],
+      selectedPace,
+      pacePlus,
+      mineOn,
     }));
   } catch (_) {}
 }
@@ -110,14 +113,14 @@ function _restorePendingState() {
     isWinner: !!s.isWinner,
   }));
 
-  if (state.manualExcluded?.length) manualExcluded = new Set(state.manualExcluded);
-  if (state.ownedOnly) ownedOnly = true;
-  if (state.drawMode && state.drawMode !== 'random') {
-    setDrawMode(state.drawMode);
-    if (state.paceColor) setPaceColor(state.paceColor);
-  } else {
-    _recomputeExcluded();
-  }
+  selectedPace = state.selectedPace || null;
+  pacePlus     = !!state.pacePlus;
+  mineOn       = !!state.mineOn;
+  excluded.clear();
+  (state.excluded || []).forEach(n => excluded.add(n));
+  _syncExcludePills();
+  updateExcludeUI();
+  _updatePaceUI();
   renderOrderSlots();
   return true;
 }
@@ -129,12 +132,9 @@ function _setDateToNow() {
   document.getElementById('fDate').value = now.toISOString().slice(0, 16);
 }
 
-// User clicked an exclude-grid pill. Sync the change into manualExcluded so
-// it survives mode switches (and so manual un-excludes don't get clobbered
-// when we re-apply the pace filter).
+// A grid pill (or a box-name bulk toggle) changed the excluded set. The grid has
+// already mutated `excluded`; just refresh the dependent UI.
 function _onPillToggle(name, nowExcluded) {
-  if (nowExcluded) manualExcluded.add(name);
-  else             manualExcluded.delete(name);
   updateExcludeUI();
 }
 
@@ -149,26 +149,27 @@ function toggleExclude() {
 
 function updateExcludeUI() {
   const badge = document.getElementById('exBadge');
-  const n = excluded.size;
-  badge.textContent = n;
-  badge.classList.toggle('visible', n > 0);
+  if (!badge) return;
+  badge.textContent = chars.length - excluded.size;   // pool size: starts full, shrinks as you exclude
+  badge.classList.add('visible');
 }
 
 function excludeAll() {
-  chars.forEach(c => {
-    excluded.add(c.name);
-    manualExcluded.add(c.name);
-    const btn = document.querySelector(`#excludeGrid .char-pill[data-name="${CSS.escape(c.name)}"]`);
-    btn?.classList.add('excluded');
-  });
+  selectedPace = null;
+  mineOn = false;
+  chars.forEach(c => excluded.add(c.name));
+  _syncExcludePills();
   updateExcludeUI();
+  _updatePaceUI();
 }
 
 function clearExcluded() {
+  selectedPace = null;
+  mineOn = false;
   excluded.clear();
-  manualExcluded.clear();
-  document.querySelectorAll('#excludeGrid .char-pill').forEach(b => b.classList.remove('excluded'));
+  _syncExcludePills();
   updateExcludeUI();
+  _updatePaceUI();
 }
 
 function applyExclude() {
@@ -178,92 +179,132 @@ function applyExclude() {
   chevron.classList.remove('open');
 }
 
-// ── DRAW MODE / PACE ─────────────────────────────────────────────────────────
+// ── PACE / MINE SELECTION ─────────────────────────────────────────────────────
+// Pace is a single-select *inclusion* filter: clicking a colour RESETS the pool
+// to that colour's characters (or the colour plus its neighbours when Pace+ is
+// on) — it is not additive. "Mine" is a sticky toggle that further limits the
+// pool to your boxes, and every reset takes it into account. The per-character
+// pills below let you fine-tune on top after a reset.
 
-function setDrawMode(mode) {
-  drawMode = mode;
-  const sel = document.getElementById('drawModeSel');
-  if (sel && sel.value !== mode) sel.value = mode;
-  setVisible('paceColors', mode !== 'random');
-  if (mode === 'random') {
-    paceColor = null;
-    document.querySelectorAll('#paceColors .pace-color').forEach(b => b.classList.remove('on'));
-  }
-
-  const locked = mode !== 'random';
-  document.getElementById('excludeBody').classList.toggle('locked', locked);
-  setVisible('excludeLockedHint', locked);
-
-  _recomputeExcluded();
-  _updateActionBtns();
-}
-
-function setPaceColor(color) {
-  paceColor = paceColor === color ? null : color;
-  document.querySelectorAll('#paceColors .pace-color').forEach(b => {
-    b.classList.toggle('on', b.dataset.pace === paceColor);
-  });
-  _recomputeExcluded();
-  _updateActionBtns();
-}
-
-function _allowedPaces() {
-  if (drawMode === 'random' || !paceColor) return null;
-  if (drawMode === 'pace') return new Set([paceColor]);
-  const i = PACE_ORDER.indexOf(paceColor);
-  return new Set(PACE_ORDER.slice(Math.max(0, i - 1), Math.min(PACE_ORDER.length, i + 2)));
-}
-
-function _recomputeExcluded() {
-  const allowed = _allowedPaces();
-  excluded = new Set(manualExcluded);
-  if (allowed) {
-    for (const c of chars) {
-      if (!allowed.has(c.pace)) excluded.add(c.name);
-    }
-  }
-  if (ownedOnly && ownedBoxes.size) {
-    for (const c of chars) {
-      if (!ownedBoxes.has(c.box)) excluded.add(c.name);
-    }
-  }
+// Re-sync every pill's class from the current excluded set.
+function _syncExcludePills() {
   document.querySelectorAll('#excludeGrid .char-pill').forEach(btn => {
     btn.classList.toggle('excluded', excluded.has(btn.dataset.name));
   });
+}
+
+// The paces a colour selection covers: just that colour, or it plus its
+// immediate neighbours when Pace+ is on.
+function _paceBand(color) {
+  if (!pacePlus) return new Set([color]);
+  const i = PACE_ORDER.indexOf(color);
+  return new Set(PACE_ORDER.slice(Math.max(0, i - 1), i + 2));
+}
+
+// Rebuild the exclusion set from the current pace + Mine selection: anything
+// outside the selected pace band — or, when Mine is on, outside your boxes — is
+// excluded; everything else is included.
+function _applyPaceSelection() {
+  const band    = selectedPace ? _paceBand(selectedPace) : null;
+  const useMine = mineOn && !!getCurrentUser() && ownedBoxes.size > 0;
+  excluded.clear();
+  for (const c of chars) {
+    if ((band && !band.has(c.pace)) || (useMine && !ownedBoxes.has(c.box))) {
+      excluded.add(c.name);
+    }
+  }
+  _syncExcludePills();
   updateExcludeUI();
-}
-
-function toggleOwnedOnly() {
-  if (!getCurrentUser()) {
-    showErr('Sign in to filter by owned boxes.');
-    return;
-  }
-  if (!ownedBoxes.size) {
-    showErr('Mark which boxes you own on the account page first.');
-    return;
-  }
-  ownedOnly = !ownedOnly;
-  _updateOwnedToggleUI();
-  _recomputeExcluded();
   _updateActionBtns();
-  _saveLiveState();
 }
 
-function _updateOwnedToggleUI() {
-  const btn = document.getElementById('ownedOnlyBtn');
-  if (!btn) return;
+// Reflect the current selection: the swatches in the selected band, the Pace+
+// toggle, and the Mine button (active + enabled state + tooltip).
+function _updatePaceUI() {
+  const band = selectedPace ? _paceBand(selectedPace) : null;
+  for (const color of PACE_ORDER) {
+    const el = document.querySelector(`#paceColors .pace-color[data-pace="${color}"]`);
+    if (!el) continue;
+    el.classList.remove('sel-primary', 'sel-neighbor', 'sel-out');
+    if (!band) continue;
+    el.classList.add(color === selectedPace ? 'sel-primary' : band.has(color) ? 'sel-neighbor' : 'sel-out');
+  }
+  const modeBtns = document.querySelectorAll('#paceMode .seg-btn');
+  modeBtns[0]?.classList.toggle('on', !pacePlus);
+  modeBtns[1]?.classList.toggle('on',  pacePlus);
+
+  const mineBtn = document.getElementById('ownedOnlyBtn');
+  if (!mineBtn) return;
   const enabled = !!getCurrentUser() && ownedBoxes.size > 0;
-  btn.classList.toggle('on', ownedOnly && enabled);
-  btn.classList.toggle('disabled', !enabled);
-  btn.title = !getCurrentUser()
+  mineBtn.classList.toggle('disabled', !enabled);
+  mineBtn.classList.toggle('on', mineOn && enabled);
+  mineBtn.title = !getCurrentUser()
     ? 'Sign in to filter by owned boxes'
     : !ownedBoxes.size
       ? 'Mark which boxes you own on the account page first'
-      : (ownedOnly ? 'Showing only characters from your boxes' : 'Show only characters from your boxes');
-  if (!enabled && ownedOnly) {
-    ownedOnly = false;
-    _recomputeExcluded();
-  }
+      : mineOn ? 'Pool limited to your boxes' : 'Limit the pool to your boxes';
+}
+
+// Clicking a colour resets the pool to that colour's band (not additive).
+function selectPace(color) {
+  selectedPace = color;
+  _applyPaceSelection();
+  _updatePaceUI();
+}
+
+// "Pace" vs "Pace+" — whether a colour selection also covers the neighbours.
+function setPaceMode(plus) {
+  pacePlus = plus;
+  if (selectedPace) _applyPaceSelection();   // re-apply with the wider/narrower band
+  _updatePaceUI();
+}
+
+function toggleMine() {
+  if (!getCurrentUser()) { showErr('Sign in to filter by owned boxes.'); return; }
+  if (!ownedBoxes.size)  { showErr('Mark which boxes you own on the account page first.'); return; }
+  mineOn = !mineOn;
+  _applyPaceSelection();
+  _updatePaceUI();
+}
+
+// ── PLAYERS LEGEND LAYOUT ─────────────────────────────────────────────────────
+// Lay the legend out in balanced rows: keep it on one line if it fits, otherwise
+// split it in half — and recurse on each half — so rows stay even ("2 + 2", never
+// "3 + 1"), and the " | " separators only ever sit between items on a row.
+let _legendResizeId = null;
+
+function _layoutLegend() {
+  const host = document.getElementById('playersLegend');
+  if (!host) return;
+
+  // Measure candidate rows with a hidden clone that copies the legend's font.
+  const cs   = getComputedStyle(host);
+  const meas = document.createElement('span');
+  meas.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;'
+    + `font:${cs.fontWeight} ${cs.fontSize}/${cs.lineHeight} ${cs.fontFamily};letter-spacing:${cs.letterSpacing};`;
+  document.body.appendChild(meas);
+  const maxW = host.clientWidth;
+  if (!maxW) { meas.remove(); return; }   // hidden (e.g. live game) — keep current markup
+  const fits = arr => { meas.textContent = arr.join('  |  '); return meas.offsetWidth <= maxW; };
+
+  const split = arr => {
+    if (arr.length <= 1 || fits(arr)) return [arr];
+    const mid = Math.ceil(arr.length / 2);
+    return [...split(arr.slice(0, mid)), ...split(arr.slice(mid))];
+  };
+  const rows = split(LEGEND_ITEMS);
+  meas.remove();
+
+  host.innerHTML = rows.map(r =>
+    `<span class="legend-row">${
+      r.map(it => `<span class="legend-item">${it}</span>`).join('<span class="legend-sep"> | </span>')
+    }</span>`
+  ).join('');
+}
+
+function _onLegendResize() {
+  clearTimeout(_legendResizeId);
+  _legendResizeId = setTimeout(_layoutLegend, 150);
 }
 
 // ── SLOT MANAGEMENT ──────────────────────────────────────────────────────────
@@ -433,7 +474,6 @@ function renderOrderSlots() {
 function _updateActionBtns() {
   const filled     = orderSlots.filter(s => s.char).length;
   const empties    = orderSlots.length - filled;
-  const needsColor = drawMode !== 'random' && !paceColor;
 
   const drawAllEmptyBtn = document.getElementById('drawAllEmptyBtn');
   const drawAllBtn      = document.getElementById('drawAllBtn');
@@ -442,13 +482,12 @@ function _updateActionBtns() {
   const submitBtn       = document.getElementById('submitBtn');
 
   if (drawAllEmptyBtn) {
-    drawAllEmptyBtn.disabled = empties === 0 || needsColor;
-    drawAllEmptyBtn.title    = needsColor ? 'Pick a pace first' :
-                               empties === 0 ? 'All slots are filled' : '';
+    drawAllEmptyBtn.disabled = empties === 0;
+    drawAllEmptyBtn.title    = empties === 0 ? 'All slots are filled' : '';
   }
   if (drawAllBtn) {
-    drawAllBtn.disabled = needsColor;
-    drawAllBtn.title    = needsColor ? 'Pick a pace first' : '';
+    drawAllBtn.disabled = false;
+    drawAllBtn.title    = '';
   }
   if (shuffleBtn) {
     shuffleBtn.disabled = filled < 2;
@@ -649,15 +688,13 @@ function discardLiveGame() {
   addOrderSlot();
   addOrderSlot();
 
-  manualExcluded.clear();
   excluded.clear();
-  setDrawMode('random');
-  paceColor = null;
-  ownedOnly = false;
-  _updateOwnedToggleUI();
-  document.querySelectorAll('#paceColors .pace-color').forEach(b => b.classList.remove('on'));
-  document.querySelectorAll('#excludeGrid .char-pill').forEach(b => b.classList.remove('excluded'));
+  selectedPace = null;
+  pacePlus = false;
+  mineOn = false;
+  _syncExcludePills();
   updateExcludeUI();
+  _updatePaceUI();
 
   setLiveUI(false);
 }

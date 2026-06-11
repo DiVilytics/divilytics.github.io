@@ -89,52 +89,46 @@
       </div>
     </div>
 
-    <div class="section-label">
-      <span>Draw Character Mode</span>
-      <div class="header-actions">
+    <div class="section-label"><span>Characters and Players</span></div>
+    <div class="draw-mode-row">
+      <button class="exclude-toggle exclude-toggle-inline" type="button" onclick="toggleExclude()">
+        <span class="exclude-toggle-label">Draw pool</span>
+        <div class="toggle-right">
+          <span class="badge" id="exBadge"></span>
+          <span class="chevron" id="exChevron">▼</span>
+        </div>
+      </button>
+      <div class="draw-mode-actions">
         <button class="btn btn-primary btn-sm" id="drawAllEmptyBtn" type="button" onclick="drawAllEmpty()">Draw empty</button>
         <button class="btn btn-primary btn-sm" id="drawAllBtn" type="button" onclick="drawAll()">Draw all</button>
       </div>
     </div>
-    <div class="draw-mode-row">
-      <select class="draw-mode-select" id="drawModeSel" onchange="setDrawMode(this.value)">
-        <option value="random">Random</option>
-        <option value="pace">Pace</option>
-        <option value="paceplus">Pace+</option>
-      </select>
-      <div class="pace-colors hidden" id="paceColors">
-        <button class="pace-color green"  data-pace="green"  onclick="setPaceColor('green')"  type="button" title="Green"></button>
-        <button class="pace-color yellow" data-pace="yellow" onclick="setPaceColor('yellow')" type="button" title="Yellow"></button>
-        <button class="pace-color orange" data-pace="orange" onclick="setPaceColor('orange')" type="button" title="Orange"></button>
-        <button class="pace-color red"    data-pace="red"    onclick="setPaceColor('red')"    type="button" title="Red"></button>
-      </div>
-      <div class="draw-mode-actions">
-        <button class="exclude-toggle exclude-toggle-inline owned-toggle" id="ownedOnlyBtn" type="button" onclick="toggleOwnedOnly()">
-          <span class="exclude-toggle-label">Mine</span>
-        </button>
-        <button class="exclude-toggle exclude-toggle-inline" type="button" onclick="toggleExclude()">
-          <span class="exclude-toggle-label">Exclude</span>
-          <div class="toggle-right">
-            <span class="badge" id="exBadge"></span>
-            <span class="chevron" id="exChevron">▼</span>
-          </div>
-        </button>
-      </div>
-    </div>
     <div class="exclude-body" id="excludeBody">
-      <div class="exclude-locked-hint hidden" id="excludeLockedHint">Filter is controlled by pace mode</div>
       <div class="filter-actions">
         <button class="txt-btn" onclick="excludeAll()">Exclude all</button>
         <span class="sep">|</span>
+        <button class="txt-btn owned-toggle" id="ownedOnlyBtn" type="button" onclick="toggleMine()">My boxes</button>
+        <span class="sep">|</span>
         <button class="txt-btn" onclick="clearExcluded()">Clear</button>
-        <button class="btn btn-primary btn-sm filter-apply-btn" onclick="applyExclude()">Apply filter</button>
+        <button class="btn btn-primary btn-sm filter-apply-btn" onclick="applyExclude()">Done</button>
+      </div>
+      <div class="filter-bulk-row">
+        <div class="seg pace-mode" id="paceMode">
+          <button class="seg-btn on" type="button" onclick="setPaceMode(false)" title="Draw only the selected colour">Pace</button>
+          <button class="seg-btn"    type="button" onclick="setPaceMode(true)"  title="Also include the neighbouring colours">Pace+</button>
+        </div>
+        <div class="pace-colors" id="paceColors">
+          <button class="pace-color green"  data-pace="green"  onclick="selectPace('green')"  type="button" title="Draw only green characters"></button>
+          <button class="pace-color yellow" data-pace="yellow" onclick="selectPace('yellow')" type="button" title="Draw only yellow characters"></button>
+          <button class="pace-color orange" data-pace="orange" onclick="selectPace('orange')" type="button" title="Draw only orange characters"></button>
+          <button class="pace-color red"    data-pace="red"    onclick="selectPace('red')"    type="button" title="Draw only red characters"></button>
+        </div>
       </div>
       <div id="excludeGrid"></div>
     </div>
 
     <div class="section-label">
-      <span>Players</span>
-      <span class="players-legend"><span class="legend-item">🎲 = draw</span> | <span class="legend-item">👤 = you</span> | <span class="legend-item">👑 = winner</span> | <span class="legend-item">❌ = remove</span></span>
+      <span class="players-legend" id="playersLegend"><span class="legend-item">🎲 = draw</span> | <span class="legend-item">👤 = you</span> | <span class="legend-item">👑 = winner</span> | <span class="legend-item">❌ = remove</span></span>
       <div class="header-actions">
         <button class="btn btn-primary btn-sm" id="shuffleOrderBtn" type="button" onclick="shuffleOrder()">Shuffle order</button>
         <select id="playerCountSel" class="players-count-select" onchange="setPlayerCount(this.value)">

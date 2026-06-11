@@ -118,29 +118,69 @@ function _renderMonthPickerPanel() {
     </div>`;
 }
 
+let _csLoadToken = 0;
+
 async function _renderMonthlyReport() {
   const host = document.getElementById('csSummary');
   if (!host) return;
-  host.innerHTML = '<div class="spinner spinner-inline">Loading…</div>';
+
+  const label = csReportMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const token = ++_csLoadToken;
+
+  // On a month change the cards already exist — keep them in place (dimmed) and
+  // just retarget the header, so the layout never collapses while loading. Only
+  // the very first load (no cards yet) shows the spinner scaffold.
+  if (host.querySelector('.cs-summary')) {
+    _setReportHeader(label, null);
+    host.classList.add('cs-report-loading');
+  } else {
+    host.innerHTML = _renderRosterSummary([], label, null, true);
+  }
+
   const monthly = await _loadMonthCharacterStats(csReportMonth);
-  host.innerHTML = _renderRosterSummary(monthly.stats, monthly.label, monthly.gameCount);
+  if (token !== _csLoadToken) return;   // a newer month was requested — ignore stale result
+  host.classList.remove('cs-report-loading');
+  host.innerHTML = _renderRosterSummary(monthly.stats, monthly.label, monthly.gameCount, false);
 }
 
-function _renderRosterSummary(rows, monthLabel, gameCount) {
+// Retarget the report header (month label + game count + next-nav state) in place,
+// without rebuilding the cards below it.
+function _setReportHeader(label, gameCount) {
+  const host = document.getElementById('csSummary');
+  if (!host) return;
+  const btn = host.querySelector('.cs-month-text');
+  if (btn) {
+    const countTxt = gameCount == null ? '…' : `${gameCount} ${gameCount === 1 ? 'game' : 'games'}`;
+    btn.textContent = `Monthly report: ${label} (${countTxt})`;
+  }
+  const navs = host.querySelectorAll('.cs-summary-header .cs-month-nav');
+  if (navs[1]) navs[1].disabled = _isFutureMonth(
+    new Date(csReportMonth.getFullYear(), csReportMonth.getMonth() + 1, 1)
+  );
+}
+
+function _renderRosterSummary(rows, monthLabel, gameCount, loading = false) {
   const nextDisabled = _isFutureMonth(
     new Date(csReportMonth.getFullYear(), csReportMonth.getMonth() + 1, 1)
   );
+  const countTxt = gameCount == null
+    ? '…'
+    : `${gameCount} ${gameCount === 1 ? 'game' : 'games'}`;
   const header = monthLabel
     ? `<div class="cs-summary-header">
          <button class="cs-month-nav" type="button" onclick="csShiftMonth(-1)" title="Previous month">‹</button>
          <span class="cs-month-picker-wrap">
-           <button class="cs-month-text" type="button" onclick="csOpenMonthPicker(event)" title="Pick month">Monthly report: ${_esc(monthLabel)} (${gameCount} ${gameCount === 1 ? 'game' : 'games'})</button>
+           <button class="cs-month-text" type="button" onclick="csOpenMonthPicker(event)" title="Pick month">Monthly report: ${_esc(monthLabel)} (${countTxt})</button>
            <div class="cs-month-picker-panel" id="csMonthPickerPanel" role="dialog" aria-label="Pick month"></div>
          </span>
          <button class="cs-month-nav" type="button" onclick="csShiftMonth(1)" title="Next month"${nextDisabled ? ' disabled' : ''}>›</button>
        </div>`
     : '';
-  if (!rows.length) return header;
+
+  // Loaded month with no games: keep the header, drop the cards for a short note.
+  if (!loading && !rows.length) {
+    return `${header}<div class="cs-summary-empty">No games recorded this month.</div>`;
+  }
 
   const withPct = rows.map(r => ({
     name:  r.character,
@@ -157,20 +197,32 @@ function _renderRosterSummary(rows, monthLabel, gameCount) {
   const fmtWins  = r => String(r.wins);
   const fmtGames = r => String(r.games);
 
+  // While loading, the body is a skeleton with the same structure (Top/Bottom +
+  // three rows each) so the card is already the right height — no first-load jump.
+  const skelRow  = `<div class="cs-mini-row cs-skel"><span class="cs-skel-dot"></span><span class="cs-skel-bar"></span></div>`;
+  const skelBody = `<div class="cs-mini-section-lbl">Top</div>${skelRow.repeat(3)}<div class="cs-mini-section-lbl">Bottom</div>${skelRow.repeat(3)}`;
+
   const card = (title, sortedRows, fmt) => {
-    const top    = sortedRows.slice(0, 3);
-    const bottom = sortedRows.slice(-3).reverse();
-    const row = r => `
-      <a class="cs-mini-row" href="characters.html?char=${encodeURIComponent(r.name)}" title="${_esc(r.name)}">
-        <img class="char-portrait" src="${charImgSrc(r.name)}" onerror="this.src='asset/players/default.svg'" alt="${_esc(r.name)}">
-        <span class="cs-mini-val">${fmt(r)}</span>
-      </a>`;
+    let body;
+    if (loading) {
+      body = skelBody;
+    } else {
+      const top    = sortedRows.slice(0, 3);
+      const bottom = sortedRows.slice(-3).reverse();
+      const row = r => `
+        <a class="cs-mini-row" href="characters.html?char=${encodeURIComponent(r.name)}" title="${_esc(r.name)}">
+          <img class="char-portrait" src="${charImgSrc(r.name)}" onerror="this.src='asset/players/default.svg'" alt="${_esc(r.name)}">
+          <span class="cs-mini-val">${fmt(r)}</span>
+        </a>`;
+      body = `
+        <div class="cs-mini-section-lbl">Top</div>
+        ${top.map(row).join('')}
+        ${bottom.length ? `<div class="cs-mini-section-lbl">Bottom</div>${bottom.map(row).join('')}` : ''}`;
+    }
     return `
       <div class="cs-summary-card">
         <div class="cs-summary-title">${title}</div>
-        <div class="cs-mini-section-lbl">Top</div>
-        ${top.map(row).join('')}
-        ${bottom.length ? `<div class="cs-mini-section-lbl">Bottom</div>${bottom.map(row).join('')}` : ''}
+        ${body}
       </div>`;
   };
 
@@ -186,6 +238,8 @@ let csMode    = 'pct';   // 'pct' | 'count' | 'games'
 let csChar    = null;      // character record from DB
 let csBuckets = null;      // computed stats per player count
 let csAllChars  = [];        // full character list for search
+let csAvgDur    = null;      // avg game duration (minutes) across this character's games
+let csAvgTurns  = null;      // avg rounds across this character's games
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
@@ -266,6 +320,16 @@ async function renderDetailPage(charName) {
   }
 
   csBuckets = _foldBuckets(buckets);
+
+  // Avg duration / rounds across every game this character was played in (one row
+  // per game — a character appears at most once per game).
+  const { data: dgames } = await db
+    .from('game_players')
+    .select('games(duration_minutes, num_turns)')
+    .eq('character', charName);
+  csAvgDur   = avg((dgames || []).map(r => r.games?.duration_minutes));
+  csAvgTurns = avg((dgames || []).map(r => r.games?.num_turns));
+
   render();
   await renderFaq(charName);
 }
@@ -346,7 +410,19 @@ function render() {
     return csMode === 'count' ? b.wins : csMode === 'games' ? b.games : b.wins / b.games;
   })) || 1;
 
+  const overall  = csBuckets.all;
+  const csWinPct = overall.games ? Math.round((overall.wins / overall.games) * 100) : 0;
+
   root.innerHTML = `
+    <div class="summary">
+      ${statBoxesHTML([
+        { val: overall.games,   lbl: 'Games' },
+        { val: csAvgDur   != null ? Math.round(csAvgDur) + 'm' : '-', lbl: 'Avg duration' },
+        { val: csAvgTurns != null ? Math.round(csAvgTurns)     : '-', lbl: 'Avg rounds' },
+        { val: csWinPct + '%',  lbl: 'Win rate' },
+        { val: overall.wins,    lbl: 'Wins' },
+      ])}
+    </div>
     <div class="controls mb-1">
       <div class="seg">
         <button class="seg-btn ${csMode === 'pct'   ? 'on' : ''}" onclick="csSetMode('pct')">% Wins</button>
@@ -369,7 +445,7 @@ function render() {
           : 0;
         const dispVal = b.games
           ? (csMode === 'count' ? b.wins : csMode === 'games' ? b.games : Math.round(pct * 100) + '%')
-          : '|';
+          : '-';
         const secondary = csMode === 'games' ? b.wins : b.games;
         return `
           <div class="lb-row">

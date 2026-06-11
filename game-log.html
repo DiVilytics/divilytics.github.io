@@ -48,6 +48,8 @@
     </div>
   </div>
 
+  <div class="err" id="err"></div>
+
   <!-- Filters -->
   <div class="filter-bar">
     <div class="pill-group" id="countPills">
@@ -59,7 +61,7 @@
       <button class="pill" onclick="setCountFilter(6)">6p</button>
     </div>
     <button class="filter-char-toggle" onclick="toggleCharFilter()" id="charFilterToggle">
-      <span>Filter by character</span>
+      <span>Included characters</span>
       <div class="toggle-right">
         <span class="badge" id="charBadge"></span>
         <span class="chevron" id="charChevron">▼</span>
@@ -67,11 +69,26 @@
     </button>
     <div class="filter-char-panel" id="charFilterPanel">
       <div class="filter-actions">
-        <button class="txt-btn" onclick="selectAllChars()">Select all</button>
+        <button class="txt-btn" onclick="glExcludeAll()">Exclude all</button>
         <span class="sep">|</span>
-        <button class="txt-btn" onclick="clearChars()">Clear</button>
-        <button class="btn btn-primary btn-sm filter-apply-btn" onclick="applyCharFilter()">Apply filter</button>
+        <button class="txt-btn owned-toggle" id="glMineBtn" type="button" onclick="glToggleMine()">My boxes</button>
+        <span class="sep">|</span>
+        <button class="txt-btn" onclick="glClearExcluded()">Clear</button>
+        <button class="btn btn-primary btn-sm filter-apply-btn" onclick="applyCharFilter()">Done</button>
       </div>
+      <div class="filter-bulk-row">
+        <div class="seg pace-mode" id="glPaceMode">
+          <button class="seg-btn on" type="button" onclick="glSetPaceMode(false)" title="Select only the chosen colour">Pace</button>
+          <button class="seg-btn"    type="button" onclick="glSetPaceMode(true)"  title="Also select the neighbouring colours">Pace+</button>
+        </div>
+        <div class="pace-colors" id="glPaceColors">
+          <button class="pace-color green"  data-pace="green"  onclick="glSelectPace('green')"  type="button" title="Only green characters"></button>
+          <button class="pace-color yellow" data-pace="yellow" onclick="glSelectPace('yellow')" type="button" title="Only yellow characters"></button>
+          <button class="pace-color orange" data-pace="orange" onclick="glSelectPace('orange')" type="button" title="Only orange characters"></button>
+          <button class="pace-color red"    data-pace="red"    onclick="glSelectPace('red')"    type="button" title="Only red characters"></button>
+        </div>
+      </div>
+      <p class="gl-filter-hint">Click to exclude characters; games using any excluded character are hidden.</p>
       <div id="charGrid"></div>
     </div>
   </div>

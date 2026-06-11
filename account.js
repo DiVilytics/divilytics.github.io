@@ -31,7 +31,6 @@ async function init() {
   _acctAch        = computeCharacterAchievements(gpRes.data || []);
   await _loadIdentities();
   _renderPage();
-  _renderStatsCard();
 }
 
 async function _loadIdentities() {
@@ -58,20 +57,38 @@ function _renderPage() {
   _acctAvatar   = profile?.avatar_url || null;
   _acctFallback = profile?.default_avatar || 'asset/players/default.svg';
 
-  const metaLn  = profile?.created_at ? `Since ${fmtDateShort(profile.created_at)}` : null;
+  const title = document.getElementById('acctTitle');
+  if (title) {
+    title.innerHTML = _acctNick
+      ? `<span class="acct-title">Account <span class="ph-sep">|</span> <span class="acct-title-name">${_esc(_acctNick)}</span></span>`
+      : 'Account';
+  }
 
   const root = document.getElementById('acctRoot');
   root.className = '';
   root.innerHTML = `
-    <div class="acct-identity">
-      <span id="acctAvatarPreviewWrap"></span>
-      <div>
-        <div class="acct-nick">${_esc(_acctNick || '|')}</div>
-        ${metaLn ? `<div class="pf-since">${_esc(metaLn)}</div>` : ''}
+    <div class="acct-section">
+      <div class="section-label">
+        <span>Player icon</span>
+        <button class="btn btn-ghost btn-sm" id="removeAvatarBtn" onclick="removeAvatar()" ${_acctAvatar ? '' : 'disabled'}>Use default icon</button>
       </div>
+      <div class="err" id="avatarErr"></div>
+      <div class="avatar-tabs" role="tablist">
+        <button class="avatar-tab selected" id="avatarTabPhotos"  type="button" onclick="_showAvatarTab('photos')">Presets</button>
+        <button class="avatar-tab"          id="avatarTabBuilder" type="button" onclick="_showAvatarTab('builder')">Build your own</button>
+      </div>
+      <div class="avatar-pane" id="avatarPanePhotos">
+        <div class="builder-preview" id="photosPreview"></div>
+        <div class="avatar-picker" id="avatarPicker"></div>
+      </div>
+      <div class="avatar-pane" id="avatarPaneBuilder" hidden></div>
     </div>
 
-    <div id="acctStats"></div>
+    <div class="acct-section">
+      <div class="section-label">My boxes</div>
+      <div class="err" id="boxesErr"></div>
+      <div class="box-picker" id="boxPicker"></div>
+    </div>
 
     <div class="acct-section">
       ${(() => {
@@ -82,33 +99,10 @@ function _renderPage() {
     </div>
 
     <div class="acct-section">
-      <div class="section-label">My boxes</div>
-      <div class="err" id="boxesErr"></div>
-      <div class="box-picker" id="boxPicker"></div>
-    </div>
-
-    <div class="acct-section">
-      <div class="section-label">
-        <span>Player icon</span>
-        <button class="btn btn-ghost btn-sm" id="removeAvatarBtn" onclick="removeAvatar()" ${_acctAvatar ? '' : 'disabled'}>Use default icon</button>
-      </div>
-      <div class="err" id="avatarErr"></div>
-      <div class="avatar-tabs" role="tablist">
-        <button class="avatar-tab selected" id="avatarTabPhotos"  type="button" onclick="_showAvatarTab('photos')">Photos</button>
-        <button class="avatar-tab"          id="avatarTabBuilder" type="button" onclick="_showAvatarTab('builder')">Build your own</button>
-      </div>
-      <div class="avatar-pane" id="avatarPanePhotos">
-        <div class="avatar-picker" id="avatarPicker"></div>
-      </div>
-      <div class="avatar-pane" id="avatarPaneBuilder" hidden></div>
-    </div>
-
-    <div class="acct-section">
       <div class="section-label">Account</div>
       <div class="err" id="identitiesErr"></div>
       <div id="identitiesList" class="acct-identities">${_renderIdentitiesHTML()}</div>
       <div class="acct-actions">
-        <button class="btn btn-ghost" onclick="changeNickname()">Change nickname</button>
         <button class="btn btn-ghost" id="exportDataBtn" onclick="exportMyData()">Download my data</button>
         <button class="btn btn-ghost" onclick="signOut()">Sign out</button>
       </div>
@@ -120,21 +114,9 @@ function _renderPage() {
     </div>
   `;
 
-  _renderAcctPreview();
   _buildAvatarPicker();
   _buildAvatarBuilder();
   _buildBoxPicker();
-}
-
-// Render the large identity avatar (top of page) from the current value, which
-// may be a preset photo path or a builder recipe.
-function _renderAcctPreview() {
-  const wrap = document.getElementById('acctAvatarPreviewWrap');
-  if (!wrap) return;
-  wrap.innerHTML = avatarHTML(_acctAvatar || _acctFallback, {
-    cls: 'player-avatar-lg', extraClass: 'zoomable', id: 'acctAvatarPreview',
-    lightbox: true, fallback: _acctFallback,
-  });
 }
 
 function _showAvatarTab(name) {
@@ -146,6 +128,7 @@ function _showAvatarTab(name) {
   if (photos)  photos.hidden  = isBuilder;
   if (builder) builder.hidden = !isBuilder;
   if (isBuilder) _renderBuilderPreview();
+  else           _renderPhotosPreview();
 }
 
 function _buildBoxPicker() {
@@ -191,34 +174,6 @@ async function _toggleBox(box) {
     if (btn) btn.classList.toggle('selected', wasOwned);
     showError('boxesErr', error.message);
   }
-}
-
-// ── STATS CARD ───────────────────────────────────────────────────────────────
-
-async function _renderStatsCard() {
-  const host = document.getElementById('acctStats');
-  if (!host || !_acctNick) return;
-  const { data } = await db
-    .from('player_stats')
-    .select('wins, games')
-    .eq('nickname', _acctNick)
-    .maybeSingle();
-  if (!data || !data.games) { host.innerHTML = ''; return; }
-
-  const winPct = Math.round((data.wins / data.games) * 100);
-  host.innerHTML = `
-    <div class="summary">
-      ${statBoxesHTML([
-        { val: winPct + '%', lbl: 'Win rate' },
-        { val: data.wins,    lbl: 'Wins' },
-        { val: data.games,   lbl: 'Games' },
-      ])}
-    </div>
-    <div class="acct-actions acct-stats-actions">
-      <a class="btn btn-ghost btn-sm" href="player.html?nick=${encodeURIComponent(_acctNick)}">View full profile →</a>
-      <button class="btn btn-ghost btn-sm" onclick="showProfileQR()">Share profile</button>
-    </div>
-  `;
 }
 
 // ── DATA EXPORT ──────────────────────────────────────────────────────────────
@@ -278,6 +233,14 @@ function _buildAvatarPicker() {
     img.onclick = () => _selectAvatar(value);
     picker.appendChild(img);
   }
+  _renderPhotosPreview();
+}
+
+// Large live preview of the current icon, shown above the presets grid (mirrors
+// the builder's preview). Composes recipes and presets through the same renderer.
+function _renderPhotosPreview() {
+  const host = document.getElementById('photosPreview');
+  if (host) host.innerHTML = avatarHTML(_acctAvatar || _acctFallback, { cls: 'builder-preview-av', fallback: _acctFallback });
 }
 
 // ── AVATAR BUILDER ───────────────────────────────────────────────────────────
@@ -434,7 +397,7 @@ async function _selectAvatar(value) {
   document.querySelectorAll('#avatarPicker .avatar-option').forEach(el => {
     el.classList.toggle('selected', el.dataset.value === value);
   });
-  _renderAcctPreview();
+  _renderPhotosPreview();
   _syncRemoveBtn();
   clearError('avatarErr');
   _updateAuthUI();
@@ -448,7 +411,7 @@ async function _selectAvatar(value) {
     document.querySelectorAll('#avatarPicker .avatar-option').forEach(el => {
       el.classList.toggle('selected', el.dataset.value === (previous ?? ''));
     });
-    _renderAcctPreview();
+    _renderPhotosPreview();
     _syncRemoveBtn();
     _updateAuthUI();
     showError('avatarErr', error.message);
@@ -512,23 +475,11 @@ async function _doRemoveAvatar() {
   const profile = getCurrentProfile();
   if (profile) profile.avatar_url = null;
   document.querySelectorAll('#avatarPicker .avatar-option').forEach(el => el.classList.remove('selected'));
-  _renderAcctPreview();
+  _renderPhotosPreview();
   _updateAuthUI();
   btn.textContent = 'Done!';
   // Stay disabled. Re're already on the default now. Rut rename back after the flash.
   setTimeout(() => { btn.textContent = 'Use default icon'; _syncRemoveBtn(); }, 1500);
-}
-
-// ── SHARE PROFILE QR ─────────────────────────────────────────────────────────
-
-function showProfileQR() {
-  const nick = getCurrentProfile()?.nickname;
-  if (!nick) return;
-  showQRModal(new URL(`player.html?nick=${encodeURIComponent(nick)}`, location.href).href, 'acctQrCode', 'acctQrOverlay');
-}
-
-function closeProfileQR() {
-  closeOverlay('acctQrOverlay');
 }
 
 // ── CHANGE NICKNAME ───────────────────────────────────────────────────────────
@@ -536,8 +487,15 @@ function closeProfileQR() {
 function changeNickname() {
   openChangeNicknameModal(newNick => {
     _acctNick = newNick;
-    const el = document.querySelector('.acct-nick');
-    if (el) el.textContent = newNick;
+    const nameEl = document.querySelector('#acctTitle .acct-title-name');
+    if (nameEl) {
+      nameEl.textContent = newNick;
+    } else {
+      // No nickname previously, so the title was just "Account" — build the full
+      // "Account | name" markup now.
+      const title = document.getElementById('acctTitle');
+      if (title) title.innerHTML = `<span class="acct-title">Account <span class="ph-sep">|</span> <span class="acct-title-name">${_esc(newNick)}</span></span>`;
+    }
   });
 }
 

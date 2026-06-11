@@ -79,6 +79,30 @@
 </div>
 
 
+<!-- Share profile QR sheet -->
+<div class="overlay" id="pfQrOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <h3 id="pfQrTitle">Share profile</h3>
+      <button class="sheet-close" onclick="closeProfileQR()">×</button>
+    </div>
+    <div class="sheet-body">
+      <p class="modal-hint">Others can scan this to view this player profile.</p>
+      <div class="qr-wrap">
+        <div id="pfQrCode"></div>
+      </div>
+      <div class="qr-url-row">
+        <div class="qr-url" id="qrUrlText"></div>
+        <button class="pf-btn" onclick="copyQrUrl()" title="Copy link">⎘</button>
+      </div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn btn-primary" onclick="closeProfileQR()">Done</button>
+    </div>
+  </div>
+</div>
+
 <!-- Delete game confirmation -->
 <div class="overlay" id="pfDeleteGameOverlay" onclick="if(event.target===this) pfCancelDeleteGame()">
   <div class="sheet">
@@ -98,6 +122,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="config.js"></script>
 <script src="db.js"></script>
   <script src="ui.js"></script>
