@@ -860,6 +860,7 @@ select optgroup { background: #1a1a1a; color: var(--muted); font-style: normal; 
   align-items: center;
   justify-content: space-between;
 }
+
 #formContent .section-label { margin: 10px 0 6px; min-height: 28px; }
 #formContent .form-row + .section-label { margin-top: 2px; }
 #formContent .section-label > .btn-sm,
@@ -1653,9 +1654,10 @@ select:disabled {
   border-radius: var(--rs);
   margin-top: 0;
 }
-/* When the panel is open, tuck it close under the toggle row (like the game-log
-   filter panel) instead of leaving the row's full bottom margin. */
-.draw-mode-row:has(+ .exclude-body.open) { margin-bottom: 6px; }
+/* Tuck the toggle row close to whatever follows it — the open pool panel, or
+   the Players section when the panel is closed — instead of leaving the row's
+   full bottom margin (which felt like too big a gap when closed). */
+.draw-mode-row:has(+ .exclude-body) { margin-bottom: 6px; }
 
 /* Pace/Mine selection row inside the filter: "Pace:" swatches, the Pace+
    modifier, and "Mine". */

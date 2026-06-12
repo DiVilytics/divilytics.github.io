@@ -9,6 +9,7 @@ let mineOn           = false;       // sticky: limit the pool to characters in y
 let orderSlots       = [];          // each: { id, char, isMe, isWinner }
 let orderNextId      = 0;
 let slotTimers       = {};          // slotId → setInterval id (active spin animation)
+let _shuffleTimer    = null;        // setInterval id for the shuffle-order animation
 
 // Live-game timers stay here because they tick the DOM directly. All other
 // "live game" state (start time, turns, exact duration, hasSession, hooks,
@@ -366,7 +367,16 @@ function _slotPool(excludeId) {
   return chars.filter(c => !excluded.has(c.name) && !taken.has(c.name));
 }
 
+// Stop an in-flight shuffle animation and settle the DOM to the final order.
+function _cancelShuffle() {
+  if (!_shuffleTimer) return;
+  clearInterval(_shuffleTimer);
+  _shuffleTimer = null;
+  renderOrderSlots();
+}
+
 function drawSlot(id) {
+  _cancelShuffle();
   const slot = orderSlots.find(s => s.id === id);
   if (!slot) return;
 
@@ -413,6 +423,7 @@ function drawAllEmpty() {
 }
 
 function drawAll() {
+  _cancelShuffle();
   for (const id of Object.keys(slotTimers)) { clearInterval(slotTimers[id]); }
   slotTimers = {};
   for (const s of orderSlots) s.char = '';
@@ -421,14 +432,55 @@ function drawAll() {
 }
 
 function shuffleOrder() {
+  // Stop any in-flight animations.
+  if (_shuffleTimer) { clearInterval(_shuffleTimer); _shuffleTimer = null; }
   for (const id of Object.keys(slotTimers)) { clearInterval(slotTimers[id]); }
   slotTimers = {};
+
+  // Decide the final shuffled order up front (Fisher–Yates).
   for (let i = orderSlots.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [orderSlots[i], orderSlots[j]] = [orderSlots[j], orderSlots[i]];
   }
-  renderOrderSlots();
-  _saveLiveState();
+
+  const container = document.getElementById('orderSlots');
+  const slotEls   = container ? [...container.querySelectorAll('.order-slot')] : [];
+  if (slotEls.length !== orderSlots.length) {
+    // No/odd DOM to animate — just render the result.
+    renderOrderSlots();
+    _saveLiveState();
+    return;
+  }
+
+  // Quick "shuffling" animation: the position numbers stay put while the
+  // players' portraits/names flash through random orderings, then settle on the
+  // real result. Mirrors the draw spin (reuses the .spinning highlight/pulse).
+  slotEls.forEach(el => el.classList.add('spinning'));
+
+  let ticks = 0;
+  const total = 12;
+  _shuffleTimer = setInterval(() => {
+    ticks++;
+    if (ticks >= total) {
+      clearInterval(_shuffleTimer);
+      _shuffleTimer = null;
+      renderOrderSlots();   // settle on the real shuffled order (restores selects, states)
+      _saveLiveState();
+      return;
+    }
+    const perm = [...orderSlots];
+    for (let i = perm.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [perm[i], perm[j]] = [perm[j], perm[i]];
+    }
+    slotEls.forEach((el, idx) => {
+      const s        = perm[idx];
+      const portrait = el.querySelector('.order-slot-portrait');
+      const nameEl   = el.querySelector('.order-slot-name');
+      if (portrait) portrait.src = s.char ? charImgSrc(s.char) : 'asset/players/default.svg';
+      if (nameEl)   nameEl.textContent = s.char || '— Character —';
+    });
+  }, 50);
 }
 
 function renderOrderSlots() {

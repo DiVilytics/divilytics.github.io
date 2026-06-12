@@ -486,9 +486,8 @@ async function _doRemoveAvatar() {
   _renderPreview();
   _syncCommitBtn();
   _updateAuthUI();
-  btn.textContent = 'Done!';
-  // Stay disabled. Re're already on the default now. Rut rename back after the flash.
-  setTimeout(() => { btn.textContent = 'Default'; _syncRemoveBtn(); }, 1500);
+  btn.textContent = 'Default'; 
+  _syncRemoveBtn();
 }
 
 // ── CHANGE NICKNAME ───────────────────────────────────────────────────────────
