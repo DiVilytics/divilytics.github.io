@@ -116,6 +116,21 @@ let _currentUser    = null;
 let _currentProfile = null;
 let _profileLoadFailed = false;  // true when the last fetch errored (likely offline) — don't prompt for nickname
 let _authChangeHook = null;
+let _authResolved   = false;     // true once the session check has actually run
+
+// Cache the signed-in nav avatar so the first paint (before the async session
+// check) shows it instead of the guest button — avoids a guest→avatar flash on
+// every page load for returning users.
+const NAV_AUTH_LS = 'divilytics:navAvatar';
+function _cachedNavAvatar() {
+  try { return localStorage.getItem(NAV_AUTH_LS) || null; } catch (_) { return null; }
+}
+function _setCachedNavAvatar(src) {
+  try {
+    if (src) localStorage.setItem(NAV_AUTH_LS, src);
+    else     localStorage.removeItem(NAV_AUTH_LS);
+  } catch (_) {}
+}
 
 async function initAuth(onChange) {
   _authChangeHook = onChange;
@@ -123,19 +138,23 @@ async function initAuth(onChange) {
   _updateAuthUI();  // render sign-in button immediately, before async session check
 
   const { data: { session } } = await db.auth.getSession();
+  _authResolved = true;
   if (session?.user) {
     _currentUser = session.user;
     await _loadProfile();
+  } else {
+    _setCachedNavAvatar(null);   // not logged in — drop any stale cached avatar
   }
 
   db.auth.onAuthStateChange(async (event, session) => {
+    _authResolved = true;
     const prevId = _currentUser?.id;
     _currentUser = session?.user || null;
 
     if (_currentUser && _currentUser.id !== prevId) {
       await _loadProfile();
     }
-    if (!_currentUser) _currentProfile = null;
+    if (!_currentUser) { _currentProfile = null; _setCachedNavAvatar(null); }
 
     _updateAuthUI();
 
@@ -221,19 +240,29 @@ function _updateAuthUI() {
   if (!el) return;
 
   const themeBtn = `<button class="nav-icon-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Theme"></button>`;
+  const avatarLink = src =>
+    `${themeBtn}<a class="nav-avatar-link active" href="account.html" title="Account">${avatarHTML(src, { cls: 'nav-avatar' })}</a>`;
+
+  // Before the session check resolves, fall back to the cached avatar (if any) so
+  // a returning user sees their icon immediately rather than a guest flash.
+  const cached = (!_currentUser && !_authResolved) ? _cachedNavAvatar() : null;
 
   if (_currentUser) {
     const avatarSrc = resolveAvatar(_currentProfile);
-    el.innerHTML = `${themeBtn}<a class="nav-avatar-link active" href="account.html" title="Account">${avatarHTML(avatarSrc, { cls: 'nav-avatar' })}</a>`;
+    _setCachedNavAvatar(avatarSrc);
+    el.innerHTML = avatarLink(avatarSrc);
+  } else if (cached) {
+    el.innerHTML = avatarLink(cached);
   } else {
+    if (_authResolved) _setCachedNavAvatar(null);   // confirmed signed out — drop the cache
     el.innerHTML = `${themeBtn}<button class="nav-avatar-btn" onclick="goToSignIn()" title="Sign in"><img class="nav-avatar nav-avatar-guest" src="asset/players/default.svg" alt=""></button>`;
   }
   _updateThemeBtn();
   _updateThemeIcons();
 }
 
-// Render the default (signed-out) nav button immediately — before any async
-// session check — so it never flickers in after the page loads.
+// Paint the nav immediately — the cached avatar for a returning user, else the
+// sign-in button — before the async session check, so nothing flickers in.
 _updateAuthUI();
 
 // ── NICKNAME MODAL ────────────────────────────────────────────────────────────

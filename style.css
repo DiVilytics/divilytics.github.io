@@ -430,7 +430,7 @@ main {
 
 .btn-danger { background: transparent; color: var(--red); border: 1px solid rgba(224, 84, 84, 0.2); }
 
-.btn-success { background: transparent; color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.3); }
+.btn-save { background: #f59e0b; color: #271a02; border: 1px solid #f59e0b; }
 
 .btn-sm { font-size: 12px; padding: 5px 10px; border-radius: 5px; }
 
@@ -966,7 +966,7 @@ select:disabled {
   font-family: inherit;
   font-size: 13px;
   font-weight: 500;
-  padding: 6px;
+  padding: 10px;
   cursor: pointer;
   margin-top: 0;
   transition: all 0.15s;
@@ -1245,27 +1245,24 @@ select:disabled {
 }
 
 /* ── AVATAR BUILDER ───────────────────────────────────────────────── */
-.avatar-tabs {
+/* Toolbar row: the Presets / Build .seg tabs on the left, "Use default icon" on
+   the right. */
+.avatar-tab-row {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
   margin: 4px 0 12px;
 }
-.avatar-tab {
-  flex: 1;
-  padding: 7px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--s1);
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-.avatar-tab.selected {
-  color: var(--text);
-  border-color: var(--accent);
-  background: var(--accent-d);
+.avatar-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Phone widths (iPhone SE etc.): tighten gaps + horizontal padding so the tabs
+   and the Default/Random/Apply buttons stay on one row. */
+@media (max-width: 430px) {
+  .avatar-tab-row { gap: 5px; }
+  .avatar-actions { gap: 4px; }
+  .avatar-tab-row .seg-btn { padding-left: 8px; padding-right: 8px; }
+  .avatar-tab-row .btn-sm  { padding-left: 7px; padding-right: 7px; }
 }
 .builder-wrap {
   display: flex;
@@ -1291,10 +1288,10 @@ select:disabled {
 }
 .builder-controls {
   width: 100%;
-  max-width: 320px;
   display: flex;
   flex-direction: column;
   gap: 0;
+  container-type: inline-size;
 }
 .builder-row {
   display: flex;
@@ -1329,9 +1326,13 @@ select:disabled {
 .builder-row-bg { align-items: flex-start; margin-top: 8px; }
 .builder-swatches {
   display: grid;
-  grid-template-columns: repeat(5, 24px);
+  grid-template-columns: repeat(10, 24px);
   gap: 6px;
   justify-content: flex-end;
+}
+/* All ten in one row when there's room; otherwise fall back to two rows of five. */
+@container (max-width: 380px) {
+  .builder-swatches { grid-template-columns: repeat(5, 24px); }
 }
 .builder-swatch {
   width: 24px;
@@ -1357,13 +1358,6 @@ select:disabled {
   border: none;
   padding: 0;
 }
-.builder-actions {
-  margin-top: 14px;
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-}
-
 .box-picker {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
@@ -1706,7 +1700,7 @@ select:disabled {
   object-fit: cover;
   flex-shrink: 0;
 }
-.order-slot .pf-btn { width: 30px; height: 30px; font-size: 13px; }
+.order-slot .pf-btn { width: 30px; height: 30px; font-size: 12px; }
 .order-slot-actions {
   display: flex;
   gap: 2px;
@@ -2348,9 +2342,27 @@ select:disabled {
 
 /* ── ACCOUNT PAGE ────────────────────────────────────────────────── */
 
-/* Page title with a username (e.g. "Account | Ada"). .acct-title wraps the whole
-   thing as a single flex child so the h2's gap doesn't add stray spacing around
-   the pipe. Everything inherits the h2's text colour. */
+/* Player-info identity: large avatar + name/since/actions, centred as one block.
+   The avatar doubles as the live preview, so it stays put across both icon tabs. */
+.acct-identity {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 4px 0 16px;
+}
+.acct-identity-avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--s2);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.acct-identity-info { display: flex; flex-direction: column; gap: 4px; }
+.acct-nick { font-size: 20px; font-weight: 700; color: var(--text); }
+.acct-change-nick { align-self: flex-start; margin-top: 6px; }
 
 .acct-section {
   padding: 18px 0;
@@ -2503,7 +2515,7 @@ select:disabled {
   .btn-primary:hover                        { opacity: 0.88; }
   .btn-ghost:hover                          { color: var(--text); background: var(--s3); }
   .btn-danger:hover                         { background: var(--red-d); border-color: rgba(224, 84, 84, 0.45); }
-  .btn-success:hover                        { background: rgba(74, 222, 128, 0.1); border-color: rgba(74, 222, 128, 0.55); color: #86efac; }
+  .btn-save:hover                           { opacity: 0.88; }
   .btn-load-more:hover                      { background: var(--s2); color: var(--text); }
   .signin-btn:hover                         { background: var(--s2); border-color: var(--s4); }
   .pill:hover                               { color: var(--text); border-color: var(--s4); }

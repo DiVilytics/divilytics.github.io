@@ -493,11 +493,15 @@ function _updateActionBtns() {
     shuffleBtn.disabled = filled < 2;
     shuffleBtn.title    = filled < 2 ? 'Pick at least 2 characters first' : '';
   }
-  // Start / Save are fully validated in their handlers; we only gate them on
-  // the "fill at least 2 slots" minimum here so the UI stays honest.
-  const meaningful = filled >= 2;
-  if (startBtn)  startBtn.disabled  = !meaningful;
-  if (submitBtn) submitBtn.disabled = !meaningful;
+  // Start lights up once the lineup is complete — every player has a different
+  // character and "me" is marked. Save additionally needs the winner marked.
+  // Until then they grey out (with the reason as a tooltip). Date/sign-in are
+  // still validated in the handlers.
+  const lineupErr = _validateLineup();                     // null = ready to start
+  const hasWinner = orderSlots.some(s => s.isWinner);
+  const saveErr   = lineupErr || (hasWinner ? null : 'Mark the winner with 👑.');
+  if (startBtn)  { startBtn.disabled  = !!lineupErr; startBtn.title  = lineupErr || ''; }
+  if (submitBtn) { submitBtn.disabled = !!saveErr;   submitBtn.title = saveErr   || ''; }
 }
 
 // ── DRAG TO REORDER ───────────────────────────────────────────────────────────
@@ -632,9 +636,7 @@ function stopLive() {
 
   setLiveUI(false);
   const sb = document.getElementById('startBtn');
-  sb.textContent = 'Resume Game';
-  sb.classList.remove('btn-success');
-  sb.classList.add('btn-primary');
+  sb.textContent = 'Resume Game';   // stays purple (btn-primary)
   _updateDiscardBtn();
   liveGame.emit('stop');
   _saveLiveState();
@@ -673,9 +675,7 @@ function discardLiveGame() {
   liveGame.emit('close');
 
   const sbD = document.getElementById('startBtn');
-  sbD.textContent = 'Start Game';
-  sbD.classList.remove('btn-primary');
-  sbD.classList.add('btn-success');
+  sbD.textContent = 'Start Game';   // stays purple (btn-primary)
   clearError('err');
   document.getElementById('fLocation').value = '';
   document.getElementById('fDur').value = '';
@@ -749,9 +749,7 @@ function _doResume() {
   if (!getCurrentProfile()) { _openNicknameModal(); return; }
 
   const sbR = document.getElementById('startBtn');
-  sbR.textContent = 'Resume Game';
-  sbR.classList.remove('btn-success');
-  sbR.classList.add('btn-primary');
+  sbR.textContent = 'Resume Game';   // stays purple (btn-primary)
   clearError('err');
 
   document.getElementById('fDate').value     = state.fDate     || '';

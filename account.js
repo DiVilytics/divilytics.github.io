@@ -1,5 +1,6 @@
 let _acctChars      = [];
-let _acctAvatar     = null;
+let _acctAvatar     = null;   // the saved avatar (in the DB)
+let _pendingAvatar  = null;   // the currently-previewed selection, saved on "Apply"
 let _acctNick       = null;
 let _acctFallback   = 'asset/players/default.svg';
 let _acctBoxInfo    = {};
@@ -53,32 +54,39 @@ function _onAuthChange() {
 function _renderPage() {
   const profile = getCurrentProfile();
   const user    = getCurrentUser();
-  _acctNick     = profile?.nickname   || null;
-  _acctAvatar   = profile?.avatar_url || null;
-  _acctFallback = profile?.default_avatar || 'asset/players/default.svg';
+  _acctNick      = profile?.nickname   || null;
+  _acctAvatar    = profile?.avatar_url || null;
+  _pendingAvatar = _acctAvatar;
+  _acctFallback  = profile?.default_avatar || 'asset/players/default.svg';
 
-  const title = document.getElementById('acctTitle');
-  if (title) {
-    title.innerHTML = _acctNick
-      ? `<span class="acct-title">Account <span class="ph-sep">|</span> <span class="acct-title-name">${_esc(_acctNick)}</span></span>`
-      : 'Account';
-  }
+  const metaLn = profile?.created_at ? `Since ${fmtDateShort(profile.created_at)}` : null;
 
   const root = document.getElementById('acctRoot');
   root.className = '';
   root.innerHTML = `
     <div class="acct-section">
-      <div class="section-label">
-        <span>Player icon</span>
-        <button class="btn btn-ghost btn-sm" id="removeAvatarBtn" onclick="removeAvatar()" ${_acctAvatar ? '' : 'disabled'}>Use default icon</button>
-      </div>
+      <div class="section-label">My Profile</div>
       <div class="err" id="avatarErr"></div>
-      <div class="avatar-tabs" role="tablist">
-        <button class="avatar-tab selected" id="avatarTabPhotos"  type="button" onclick="_showAvatarTab('photos')">Presets</button>
-        <button class="avatar-tab"          id="avatarTabBuilder" type="button" onclick="_showAvatarTab('builder')">Build your own</button>
+      <div class="acct-identity">
+        <span id="acctAvatarPreviewWrap"></span>
+        <div class="acct-identity-info">
+          <div class="acct-nick">${_esc(_acctNick || '—')}</div>
+          ${metaLn ? `<div class="pf-since">${_esc(metaLn)}</div>` : ''}
+          <button class="btn btn-ghost btn-sm acct-change-nick" onclick="changeNickname()">Change nickname</button>
+        </div>
+      </div>
+      <div class="avatar-tab-row">
+        <div class="seg" role="tablist">
+          <button class="seg-btn on" id="avatarTabPhotos"  type="button" onclick="_showAvatarTab('photos')">Photos</button>
+          <button class="seg-btn"    id="avatarTabBuilder" type="button" onclick="_showAvatarTab('builder')">Build</button>
+        </div>
+        <div class="avatar-actions">
+          <button class="btn btn-ghost btn-sm" id="removeAvatarBtn" onclick="removeAvatar()" ${_acctAvatar ? '' : 'disabled'}>Default</button>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="randomizeAvatar()">Random</button>
+          <button class="btn btn-primary btn-sm" id="commitAvatarBtn" onclick="commitAvatar()" disabled>Apply</button>
+        </div>
       </div>
       <div class="avatar-pane" id="avatarPanePhotos">
-        <div class="builder-preview" id="photosPreview"></div>
         <div class="avatar-picker" id="avatarPicker"></div>
       </div>
       <div class="avatar-pane" id="avatarPaneBuilder" hidden></div>
@@ -93,7 +101,7 @@ function _renderPage() {
     <div class="acct-section">
       ${(() => {
         const { earned, total } = countAchievements(_acctAch, _acctChars);
-        return `<div class="section-label">Achievements · ${earned} / ${total}</div>`;
+        return `<div class="section-label">My Achievements · ${earned} / ${total}</div>`;
       })()}
       ${renderAchievementsGridHTML(_acctAch, _acctChars)}
     </div>
@@ -121,14 +129,23 @@ function _renderPage() {
 
 function _showAvatarTab(name) {
   const isBuilder = name === 'builder';
-  document.getElementById('avatarTabPhotos') ?.classList.toggle('selected', !isBuilder);
-  document.getElementById('avatarTabBuilder')?.classList.toggle('selected',  isBuilder);
+  document.getElementById('avatarTabPhotos') ?.classList.toggle('on', !isBuilder);
+  document.getElementById('avatarTabBuilder')?.classList.toggle('on',  isBuilder);
   const photos  = document.getElementById('avatarPanePhotos');
   const builder = document.getElementById('avatarPaneBuilder');
   if (photos)  photos.hidden  = isBuilder;
   if (builder) builder.hidden = !isBuilder;
-  if (isBuilder) _renderBuilderPreview();
-  else           _renderPhotosPreview();
+  // The identity avatar previews the active tab: the saved icon (or a clicked
+  // preset) on Presets, the in-progress composition on Build.
+  if (isBuilder) {
+    _previewBuild();
+  } else {
+    _pendingAvatar = _acctAvatar;
+    document.querySelectorAll('#avatarPicker .avatar-option').forEach(el =>
+      el.classList.toggle('selected', el.dataset.value === _acctAvatar));
+    _renderPreview();
+    _syncCommitBtn();
+  }
 }
 
 function _buildBoxPicker() {
@@ -230,17 +247,53 @@ function _buildAvatarPicker() {
     img.alt   = `Player ${i}`;
     img.dataset.value = value;
     img.onerror = () => { img.src = 'asset/players/default.svg'; };
-    img.onclick = () => _selectAvatar(value);
+    img.onclick = () => _previewAvatar(value);
     picker.appendChild(img);
   }
-  _renderPhotosPreview();
+  _renderPreview();
 }
 
-// Large live preview of the current icon, shown above the presets grid (mirrors
-// the builder's preview). Composes recipes and presets through the same renderer.
-function _renderPhotosPreview() {
-  const host = document.getElementById('photosPreview');
-  if (host) host.innerHTML = avatarHTML(_acctAvatar || _acctFallback, { cls: 'builder-preview-av', fallback: _acctFallback });
+// The large identity avatar (left of the nickname) is the live preview of the
+// pending selection — a clicked preset or the in-progress build. It's only
+// written to the profile when the user presses "Use this icon".
+function _renderPreview() {
+  const host = document.getElementById('acctAvatarPreviewWrap');
+  if (host) host.innerHTML = avatarHTML(_pendingAvatar || _acctFallback, { cls: 'acct-identity-avatar', fallback: _acctFallback });
+}
+
+// Clicking a preset previews it (highlights it + shows it large) but does not
+// save — saving happens on "Use this icon".
+function _previewAvatar(value) {
+  _pendingAvatar = value;
+  document.querySelectorAll('#avatarPicker .avatar-option').forEach(el =>
+    el.classList.toggle('selected', el.dataset.value === value));
+  _renderPreview();
+  _syncCommitBtn();
+  clearError('avatarErr');
+}
+
+// Preview the in-progress build (clears any preset highlight, since it's a build).
+function _previewBuild() {
+  _pendingAvatar = _builderRecipe();
+  document.querySelectorAll('#avatarPicker .avatar-option').forEach(el => el.classList.remove('selected'));
+  _renderPreview();
+  _syncCommitBtn();
+}
+
+// "Use this icon" lights up only when the preview differs from what's saved.
+function _syncCommitBtn() {
+  const btn = document.getElementById('commitAvatarBtn');
+  if (btn) btn.disabled = (_pendingAvatar === _acctAvatar);
+}
+
+// 🎲 — random preset on the Presets tab, random composition on the Build tab.
+function randomizeAvatar() {
+  const builderPane = document.getElementById('avatarPaneBuilder');
+  if (builderPane && !builderPane.hidden) {
+    _randomizeBuilder();
+  } else {
+    _previewAvatar(`asset/players/${1 + Math.floor(Math.random() * 19)}.jpeg`);
+  }
 }
 
 // ── AVATAR BUILDER ───────────────────────────────────────────────────────────
@@ -306,7 +359,6 @@ function _buildAvatarBuilder() {
 
   pane.innerHTML = `
     <div class="builder-wrap">
-      <div class="builder-preview" id="builderPreview"></div>
       <div class="builder-controls">
         ${rows}
         <div class="builder-row builder-row-bg">
@@ -319,19 +371,9 @@ function _buildAvatarBuilder() {
           </div>
         </div>
       </div>
-    </div>
-    <div class="builder-actions">
-      <button class="btn btn-ghost btn-sm" type="button" onclick="_randomizeBuilder()">🎲 Randomize</button>
-      <button class="btn btn-primary btn-sm" id="builderSaveBtn" onclick="_saveBuiltAvatar()">Use this icon</button>
     </div>`;
-
-  _renderBuilderPreview();
-}
-
-// Live preview, composed through the shared renderer.
-function _renderBuilderPreview() {
-  const host = document.getElementById('builderPreview');
-  if (host) host.innerHTML = avatarHTML(_builderRecipe(), { cls: 'builder-preview-av' });
+  // The Randomize / "Use this icon" actions live in the toolbar above (shared
+  // with Presets); the build is previewed when its tab opens.
 }
 
 function _cyclePart(key, dir) {
@@ -341,7 +383,7 @@ function _cyclePart(key, dir) {
   const row = document.querySelector(`.builder-row[data-key="${key}"] .builder-num`);
   if (row) row.textContent = _builderSel[key];
   _saveBuilderState();
-  _renderBuilderPreview();
+  _previewBuild();
 }
 
 // Roll a random part for every slot and a random villain background, then sync
@@ -360,7 +402,7 @@ function _randomizeBuilder() {
   const inp = document.getElementById('builderBgInput');
   if (inp) inp.value = _builderBg;
   _saveBuilderState();
-  _renderBuilderPreview();
+  _previewBuild();
 }
 
 function _setBg(color) {
@@ -370,51 +412,42 @@ function _setBg(color) {
     el.classList.toggle('selected', el.dataset.color === _builderBg);
   });
   _saveBuilderState();
-  _renderBuilderPreview();
-}
-
-async function _saveBuiltAvatar() {
-  const btn = document.getElementById('builderSaveBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
-  await _selectAvatar(_builderRecipe());
-  if (btn) {
-    btn.textContent = 'Saved ✓';
-    setTimeout(() => { btn.disabled = false; btn.textContent = 'Use this icon'; }, 1500);
-  }
+  _previewBuild();
 }
 
 // ── AVATAR ACTIONS ───────────────────────────────────────────────────────────
 
-// Click-to-save: optimistically updates the picker + nav, persists in the
-// background, and reverts on error.
-async function _selectAvatar(value) {
-  if (value === _acctAvatar) return;
+// "Use this icon": persist the previewed selection (preset or build). Optimistic,
+// reverts on error.
+async function commitAvatar() {
   const user = getCurrentUser();
-  if (!user) return;
+  if (!user || _pendingAvatar === _acctAvatar) return;
+
+  const value = _pendingAvatar;
+  const btn   = document.getElementById('commitAvatarBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  clearError('avatarErr');
 
   const previous = _acctAvatar;
   _acctAvatar = value;
-  document.querySelectorAll('#avatarPicker .avatar-option').forEach(el => {
-    el.classList.toggle('selected', el.dataset.value === value);
-  });
-  _renderPhotosPreview();
-  _syncRemoveBtn();
-  clearError('avatarErr');
-  _updateAuthUI();
-
   const profile = getCurrentProfile();
   if (profile) profile.avatar_url = value;
+  _updateAuthUI();
+  _syncRemoveBtn();
+
   const { error } = await db.from('profiles').update({ avatar_url: value }).eq('id', user.id);
   if (error) {
     _acctAvatar = previous;
     if (profile) profile.avatar_url = previous;
-    document.querySelectorAll('#avatarPicker .avatar-option').forEach(el => {
-      el.classList.toggle('selected', el.dataset.value === (previous ?? ''));
-    });
-    _renderPhotosPreview();
-    _syncRemoveBtn();
     _updateAuthUI();
+    _syncRemoveBtn();
     showError('avatarErr', error.message);
+    if (btn) { btn.textContent = 'Apply'; btn.disabled = false; }
+    return;
+  }
+  if (btn) {
+    btn.textContent = 'Saved ✓';
+    setTimeout(() => { btn.textContent = 'Apply'; _syncCommitBtn(); }, 1500);
   }
 }
 
@@ -425,33 +458,7 @@ function _syncRemoveBtn() {
   if (btn) btn.disabled = !_acctAvatar;
 }
 
-// Two-step inline confirmation: first click flips the button to "Confirm?";
-// a second click within 3s actually removes; otherwise it reverts.
-let _removeConfirmTimer = null;
-
 function removeAvatar() {
-  const btn = document.getElementById('removeAvatarBtn');
-  if (!btn) return;
-
-  if (!btn.dataset.confirming) {
-    btn.dataset.confirming = '1';
-    btn.textContent = 'Confirm?';
-    btn.classList.remove('btn-ghost');
-    btn.classList.add('btn-danger');
-    if (_removeConfirmTimer) clearTimeout(_removeConfirmTimer);
-    _removeConfirmTimer = setTimeout(() => {
-      delete btn.dataset.confirming;
-      btn.textContent = 'Use default icon';
-      btn.classList.remove('btn-danger');
-      btn.classList.add('btn-ghost');
-    }, 3000);
-    return;
-  }
-
-  clearTimeout(_removeConfirmTimer);
-  delete btn.dataset.confirming;
-  btn.classList.remove('btn-danger');
-  btn.classList.add('btn-ghost');
   _doRemoveAvatar();
 }
 
@@ -467,19 +474,21 @@ async function _doRemoveAvatar() {
   if (error) {
     showError('avatarErr', error.message);
     btn.disabled    = false;
-    btn.textContent = 'Use default icon';
+    btn.textContent = 'Default';
     return;
   }
 
   _acctAvatar = null;
+  _pendingAvatar = null;
   const profile = getCurrentProfile();
   if (profile) profile.avatar_url = null;
   document.querySelectorAll('#avatarPicker .avatar-option').forEach(el => el.classList.remove('selected'));
-  _renderPhotosPreview();
+  _renderPreview();
+  _syncCommitBtn();
   _updateAuthUI();
   btn.textContent = 'Done!';
   // Stay disabled. Re're already on the default now. Rut rename back after the flash.
-  setTimeout(() => { btn.textContent = 'Use default icon'; _syncRemoveBtn(); }, 1500);
+  setTimeout(() => { btn.textContent = 'Default'; _syncRemoveBtn(); }, 1500);
 }
 
 // ── CHANGE NICKNAME ───────────────────────────────────────────────────────────
@@ -487,15 +496,8 @@ async function _doRemoveAvatar() {
 function changeNickname() {
   openChangeNicknameModal(newNick => {
     _acctNick = newNick;
-    const nameEl = document.querySelector('#acctTitle .acct-title-name');
-    if (nameEl) {
-      nameEl.textContent = newNick;
-    } else {
-      // No nickname previously, so the title was just "Account" — build the full
-      // "Account | name" markup now.
-      const title = document.getElementById('acctTitle');
-      if (title) title.innerHTML = `<span class="acct-title">Account <span class="ph-sep">|</span> <span class="acct-title-name">${_esc(newNick)}</span></span>`;
-    }
+    const el = document.querySelector('.acct-nick');
+    if (el) el.textContent = newNick;
   });
 }
 
