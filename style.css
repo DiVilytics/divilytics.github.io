@@ -1074,12 +1074,13 @@ select:disabled {
    player rows are 1 line, so they differ in height. Even both tabs out to a
    middle height — a min-height plus slightly tighter padding so the taller
    (character) rows shrink and the shorter (player) rows grow to meet it. */
-#lb .lb-row { min-height: 47px; padding-top: 7px; padding-bottom: 7px; }
+#lb .lb-row, #pfRoot .lb-row { min-height: 47px; padding-top: 7px; padding-bottom: 7px; }
 /* The character identity is two lines (name + box) and inherits body line-height
    1.5, making it taller than the min-height can absorb. Tighten it so the block
-   fits and min-height governs both tabs to the same height. */
-#lb .row-name { line-height: 1.2; }
-#lb .row-sub  { line-height: 1.2; margin-top: 0; }
+   fits and min-height governs both tabs to the same height. Applied on the
+   leaderboard (#lb) and the player page's character board (#pfRoot) alike. */
+#lb .row-name, #pfRoot .row-name { line-height: 1.2; }
+#lb .row-sub,  #pfRoot .row-sub  { line-height: 1.2; margin-top: 0; }
 
 /* The viewer's own row, highlighted wherever it appears (top list or pinned). */
 .lb-row-self {
@@ -2342,6 +2343,20 @@ select:disabled {
   color: var(--text);
 }
 
+.home-ack { margin-top: 2rem; }
+.home-ack-card {
+  background: var(--s1);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.home-ack-card p { margin: 0; }
+.home-ack-card p + p { margin-top: 8px; }
+.home-ack-card strong { color: var(--text); font-weight: 600; }
+.home-ack-card a { color: var(--accent); text-decoration: none; }
+
 /* ── ACCOUNT PAGE ────────────────────────────────────────────────── */
 
 /* Player-info identity: large avatar + name/since/actions, centred as one block.
@@ -2511,6 +2526,7 @@ select:disabled {
   .row-name-link:hover                      { text-decoration: underline; }
   .row-sub-link:hover                       { text-decoration: underline; color: var(--muted); }
   .pf-since-link:hover                      { text-decoration: underline; text-underline-offset: 2px; color: var(--muted); }
+  .home-ack-card a:hover                    { text-decoration: underline; }
   .lb-row:hover                             { background: var(--s2); }
   .pf-identity:hover                        { opacity: 1; }
   .live-btn:hover                           { background: var(--s3); border-color: var(--s4); }

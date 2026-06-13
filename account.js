@@ -81,7 +81,7 @@ function _renderPage() {
           <button class="seg-btn"    id="avatarTabBuilder" type="button" onclick="_showAvatarTab('builder')">Build</button>
         </div>
         <div class="avatar-actions">
-          <button class="btn btn-ghost btn-sm" id="removeAvatarBtn" onclick="removeAvatar()" ${_acctAvatar ? '' : 'disabled'}>Default</button>
+          <button class="btn btn-ghost btn-sm" id="removeAvatarBtn" onclick="removeAvatar()" ${(_pendingAvatar || _acctAvatar) ? '' : 'disabled'}>Default</button>
           <button class="btn btn-ghost btn-sm" type="button" onclick="randomizeAvatar()">Random</button>
           <button class="btn btn-primary btn-sm" id="commitAvatarBtn" onclick="commitAvatar()" disabled>Apply</button>
         </div>
@@ -284,6 +284,7 @@ function _previewBuild() {
 function _syncCommitBtn() {
   const btn = document.getElementById('commitAvatarBtn');
   if (btn) btn.disabled = (_pendingAvatar === _acctAvatar);
+  _syncRemoveBtn();   // the Default button also depends on the pending preview
 }
 
 // 🎲 — random preset on the Presets tab, random composition on the Build tab.
@@ -455,7 +456,9 @@ async function commitAvatar() {
 // a custom avatar is currently set.
 function _syncRemoveBtn() {
   const btn = document.getElementById('removeAvatarBtn');
-  if (btn) btn.disabled = !_acctAvatar;
+  // Available whenever the current avatar isn't the default — whether that's a
+  // saved avatar or just an uncommitted preview (build/random/preset).
+  if (btn) btn.disabled = !_pendingAvatar && !_acctAvatar;
 }
 
 function removeAvatar() {
@@ -465,6 +468,18 @@ function removeAvatar() {
 async function _doRemoveAvatar() {
   const user = getCurrentUser();
   if (!user) return;
+
+  // Nothing saved (committed avatar is already the default): the Default button
+  // only needs to discard the uncommitted preview — no DB write.
+  if (!_acctAvatar) {
+    _pendingAvatar = null;
+    document.querySelectorAll('#avatarPicker .avatar-option').forEach(el => el.classList.remove('selected'));
+    _renderPreview();
+    _syncCommitBtn();   // also re-syncs the Default button
+    clearError('avatarErr');
+    return;
+  }
+
   const btn = document.getElementById('removeAvatarBtn');
   btn.disabled    = true;
   btn.textContent = 'Updating…';
