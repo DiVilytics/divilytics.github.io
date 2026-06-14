@@ -10,6 +10,7 @@ let orderSlots       = [];          // each: { id, char, isMe, isWinner }
 let orderNextId      = 0;
 let slotTimers       = {};          // slotId → setInterval id (active spin animation)
 let _shuffleTimer    = null;        // setInterval id for the shuffle-order animation
+let _lastAuthId;                    // last auth user id the slots were rendered for (undefined = not baselined)
 
 // Live-game timers stay here because they tick the DOM directly. All other
 // "live game" state (start time, turns, exact duration, hasSession, hooks,
@@ -26,13 +27,34 @@ const LEGEND_ITEMS = ['🎲 = draw', '👤 = you', '👑 = winner', '❌ = remov
 
 async function init() {
   setActiveNav('new-game.html');
+
+  // Build the default layout synchronously — the date and the two starter rows —
+  // BEFORE the network awaits, so the form doesn't render empty (0 rows, no date,
+  // "Add player" at the top) and then visibly fill in / shift once JS finishes.
+  // The character <select> options fill in once chars load (no visible change);
+  // a saved draft, if any, replaces these rows further down.
+  _setDateToNow();
+  orderSlots = [
+    { id: orderNextId++, char: '', isMe: false, isWinner: false },
+    { id: orderNextId++, char: '', isMe: false, isWinner: false },
+  ];
+  renderOrderSlots();
+
   // Re-render slots whenever auth state changes so the Me-locked indicator
   // updates in-place after sign-in / sign-out.
   await initAuth(async () => {
     await _loadOwnedBoxes();
     _updatePaceUI();
-    if (orderSlots.length) renderOrderSlots();
+    // Re-render slots only on a genuine sign-in/out (auth id change), not on the
+    // initial auth event or token refreshes — those are redundant here.
+    const uid = getCurrentUser()?.id || null;
+    const changed = _lastAuthId !== undefined && _lastAuthId !== uid;
+    _lastAuthId = uid;
+    if (changed && orderSlots.length) renderOrderSlots();
   });
+  // Baseline the auth id (unless the initial auth event already did) so that
+  // first event counts as "no change".
+  if (_lastAuthId === undefined) _lastAuthId = getCurrentUser()?.id || null;
   chars = await loadCharacters();
   await _loadOwnedBoxes();
   buildExcludeGrid(
@@ -41,13 +63,13 @@ async function init() {
     excluded,
     _onPillToggle
   );
-  // Default date = now (local time)
-  _setDateToNow();
   onBeforeSignIn(_savePendingState);
   const restored = _restorePendingState();
   if (!restored) {
-    addOrderSlot();
-    addOrderSlot();
+    // The starter rows are already on screen; re-render now that chars are
+    // loaded (fills the selects) and auth is resolved, then persist the draft.
+    renderOrderSlots();
+    _saveLiveState();
   }
   _updatePaceUI();
   updateExcludeUI();   // show the pool size from the start
@@ -486,7 +508,10 @@ function shuffleOrder() {
 function renderOrderSlots() {
   const container = document.getElementById('orderSlots');
 
-  const isAuthed = !!getCurrentUser();
+  // Use the cached/likely sign-in status so the "Me" lock paints correctly on
+  // the first synchronous render (before the session check resolves). It self-
+  // corrects on the post-auth re-render if the cache turns out to be wrong.
+  const isAuthed = isLikelySignedIn();
   container.innerHTML = orderSlots.map((s, i) => {
     const taken     = new Set(orderSlots.filter(o => o.id !== s.id && o.char).map(o => o.char));
     const available = chars.filter(c => !taken.has(c.name));

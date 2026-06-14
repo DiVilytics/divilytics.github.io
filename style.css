@@ -2541,6 +2541,7 @@ select:disabled {
   .exclude-toggle:hover                     { background: var(--s2); color: var(--text); }
   .txt-btn:hover                            { color: var(--text); }
   .sheet-close:hover                        { color: var(--text); background: var(--s3); }
+  .pf-btn.rand:hover                        { background: var(--s4); border-color: var(--dim); color: var(--text); }
   .pf-btn.me:hover                          { background: var(--accent-d); border-color: rgba(124, 106, 247, 0.35); color: var(--accent); }
   .pf-btn.win:hover                         { background: var(--gold-d); border-color: rgba(240, 165, 0, 0.35); color: var(--gold); }
   .pf-btn.del:hover                         { color: var(--red); border-color: rgba(224, 84, 84, 0.35); background: var(--red-d); }

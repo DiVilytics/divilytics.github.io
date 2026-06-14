@@ -199,6 +199,14 @@ async function _loadProfile() {
 function getCurrentUser()    { return _currentUser; }
 function getCurrentProfile() { return _currentProfile; }
 
+// Best-guess sign-in status for a synchronous first paint: the real value once
+// the session check has resolved, otherwise the cached nav-avatar hint ("was
+// signed in last time"). Lets UI render the right state immediately; if the
+// cache is wrong it self-corrects on the next render after auth resolves.
+function isLikelySignedIn() {
+  return _authResolved ? !!_currentUser : !!_cachedNavAvatar();
+}
+
 const _preSignInHooks = [];
 function onBeforeSignIn(fn) { _preSignInHooks.push(fn); }
 

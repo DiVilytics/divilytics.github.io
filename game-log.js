@@ -17,6 +17,7 @@ const PACE_ORDER = ['green', 'yellow', 'orange', 'red'];
 let _gameOffset     = 0;
 let _totalGames     = 0;
 let _hasMore        = false;
+let _loaded         = false;   // true once the first load() has fetched data
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
@@ -102,6 +103,7 @@ async function load(reset = true) {
 	}
 
 	_hasMore = glGames.length < _totalGames;
+	_loaded  = true;
 
 	document.getElementById('root').className = '';
 	render();
@@ -282,6 +284,10 @@ function _applyLocationOption(loc) {
 // ── RENDER ────────────────────────────────────────────────────────────────────
 
 function render() {
+	// Don't render the empty/"no games" state before the first load has run —
+	// otherwise the initAuth callback flashes it over the loading spinner.
+	if (!_loaded) return;
+
 	const hint         = document.getElementById('resultsHint');
 	const filterActive = glFilterCount !== 'all' || glExcluded.size > 0 || glFilterLocation !== null;
 	const root         = document.getElementById('root');
