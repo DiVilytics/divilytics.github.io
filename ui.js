@@ -593,14 +593,6 @@ const ACH_TIERS = [
 const ACH_EMPTY_ICON       = '·';
 const ACH_EMPTY_MEDAL_ICON = '·';
 
-// Long character names that read better as two lines in the cramped achievement
-// tile label. Returns HTML; callers must NOT pre-escape — this helper escapes
-// each part itself.
-function _fmtAchTileName(name) {
-  if (name === 'Cruella de Vil')  return 'Cruella<br>de Vil';
-  if (name === 'Queen of Hearts') return 'Queen<br>of Hearts';
-  return _esc(name);
-}
 
 function achTierFor(count) {
   let tier = -1;
@@ -634,6 +626,259 @@ function computeCharacterAchievements(playerRows) {
   return out;
 }
 
+// ── BOX COMPLETION ACHIEVEMENTS ────────────────────────────────────────────────
+// Two gold achievements per box: play every character in it, and win with every
+// character in it. Binary (gold at completion) rather than tiered, since box
+// sizes are small (1–6) and "completion" is all-or-nothing.
+
+// Per-box completion from a character→{plays,wins} map. Returns rows in release
+// order: { box, slug, size, played, won }.
+function computeBoxCompletion(charAch, allChars, boxInfo) {
+  boxInfo = boxInfo || {};
+  const byBox = groupByBox(allChars);
+  const rows = Object.entries(byBox).map(([box, cs]) => {
+    let played = 0, won = 0;
+    for (const c of cs) {
+      const s = charAch.get(c.name);
+      if (s && s.plays > 0) played++;
+      if (s && s.wins  > 0) won++;
+    }
+    return { box, slug: boxInfo[box]?.slug || '', size: cs.length, played, won };
+  });
+  rows.sort((a, b) =>
+    (boxInfo[a.box]?.order ?? 999) - (boxInfo[b.box]?.order ?? 999) || a.box.localeCompare(b.box));
+  return rows;
+}
+
+function countBoxAchievements(boxRows) {
+  let earned = 0;
+  for (const r of boxRows) {
+    if (r.size > 0 && r.played >= r.size) earned++;
+    if (r.size > 0 && r.won    >= r.size) earned++;
+  }
+  return { earned, total: boxRows.length * 2 };
+}
+
+// Compact strip of box covers — grayscale until the box is fully played (then
+// full colour, mirroring the box picker), with a gold star (played all) and cup
+// (won all) marker beneath.
+function renderBoxStripHTML(boxRows, onClickFn = '_showBoxDetail') {
+  const tiles = boxRows.map(r => {
+    const src      = r.slug ? `asset/boxes/${r.slug}.webp` : 'asset/players/default.svg';
+    const playDone = r.size > 0 && r.played >= r.size;
+    const winDone  = r.size > 0 && r.won    >= r.size;
+    return `
+      <button class="box-ach${playDone ? ' played' : ''}${winDone ? ' won' : ''}" type="button" data-box="${_esc(r.box)}" onclick="${onClickFn}(this.dataset.box)" title="${_esc(r.box)}">
+        <img class="box-ach-img" src="${src}" onerror="this.src='asset/players/default.svg'" alt="${_esc(r.box)}">
+        <div class="box-ach-medals">
+          <span class="box-ach-medal${playDone ? ' on' : ''}">${playDone ? '⭐' : '·'}</span>
+          <span class="box-ach-medal${winDone ? ' on' : ''}">${winDone ? '🏆' : '·'}</span>
+        </div>
+      </button>`;
+  }).join('');
+  return `<div class="box-ach-grid">${tiles}</div>`;
+}
+
+// Detail sheet for one box: completion status of the two tracks, then a list of
+// the box's characters with their played/won marks (so you can see what's left).
+function renderBoxDetailHTML(boxRow, boxChars, charAch) {
+  const src      = boxRow.slug ? `asset/boxes/${boxRow.slug}.webp` : 'asset/players/default.svg';
+  const playDone = boxRow.size > 0 && boxRow.played >= boxRow.size;
+  const winDone  = boxRow.size > 0 && boxRow.won    >= boxRow.size;
+
+  const trackRow = (done, count, label, icon) => `
+    <div class="ach-track-tier${done ? ' earned' : ''}">
+      <span class="ach-track-icon">${done ? icon : '·'}</span>
+      <span class="ach-track-name">${label}</span>
+      <span class="ach-track-status">${done ? 'Completed' : `${count} / ${boxRow.size}`}</span>
+    </div>`;
+
+  const charList = boxChars.map(c => {
+    const s = charAch.get(c.name) || { plays: 0, wins: 0 };
+    return `
+      <div class="box-detail-char">
+        <img class="char-portrait" src="${charImgSrc(c.name)}" onerror="this.src='asset/players/default.svg'" alt="">
+        <span class="box-detail-char-name">${_esc(c.name)}</span>
+        <span class="box-detail-marks">
+          <span class="${s.plays > 0 ? 'on' : ''}">${s.plays > 0 ? '⭐' : '·'}</span>
+          <span class="${s.wins  > 0 ? 'on' : ''}">${s.wins  > 0 ? '🏆' : '·'}</span>
+        </span>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="ach-detail-head${winDone ? ' crowned' : ''}">
+      <img class="box-detail-cover" src="${src}" onerror="this.src='asset/players/default.svg'" alt="">
+      <div class="ach-detail-name">${_esc(boxRow.box)}</div>
+    </div>
+    <div class="ach-track">
+      ${trackRow(playDone, boxRow.played, 'Play all',  '⭐')}
+      ${trackRow(winDone,  boxRow.won,    'Win all',   '🏆')}
+    </div>
+    <div class="box-detail-list">${charList}</div>`;
+}
+
+// ── GLOBAL (PROFILE-WIDE) ACHIEVEMENTS ─────────────────────────────────────────
+// Table sizes (played/won at 2p…6p), volume (games/wins, tiered 10/50/100), and
+// locations (distinct places played/won, tiered 1/5/10).
+
+const VOLUME_TIERS = [
+  { id: 'bronze', threshold: 10,  label: 'Bronze' },
+  { id: 'silver', threshold: 50,  label: 'Silver' },
+  { id: 'gold',   threshold: 100, label: 'Gold' },
+];
+const DONE_TIER = [{ id: 'gold', threshold: 1, label: 'Done' }];  // binary: gold at 1
+
+function _tierIndex(count, tiers) {
+  let t = -1;
+  for (let i = 0; i < tiers.length; i++) if (count >= tiers[i].threshold) t = i;
+  return t;
+}
+
+// Tiered medal for any tier set — star (plays) / cup (wins), tinted by tier.
+function tierMedalHTML(count, tiers, kind) {
+  const isCup = kind === 'cup';
+  const t = _tierIndex(count, tiers);
+  if (t < 0) return `<span class="ach-medal locked">·</span>`;
+  const cls = isCup ? `ach-cup ach-cup-${tiers[t].id}` : `ach-star ach-star-${tiers[t].id}`;
+  return `<span class="ach-medal ${cls}">${isCup ? '🏆' : '⭐'}</span>`;
+}
+
+// Compute the viewer's profile-wide stats. `isMine(playerRow)` selects the
+// viewer's rows out of all the players of their games.
+function computeGlobalAchievements(games, players, isMine) {
+  const countByGame = {};
+  for (const p of players) countByGame[p.game_id] = (countByGame[p.game_id] || 0) + 1;
+  const locByGame = {};
+  for (const g of games) locByGame[g.id] = g.location || null;
+
+  const tableSizes = {};
+  for (let s = 2; s <= 6; s++) tableSizes[s] = { played: 0, won: 0 };
+  let games_ = 0, wins_ = 0;
+  const playedLocs = new Set(), wonLocs = new Set();
+
+  for (const p of players) {
+    if (!isMine(p)) continue;
+    games_++;
+    const won = !!p.is_winner;
+    if (won) wins_++;
+    const size = countByGame[p.game_id] || 0;
+    if (size >= 2 && size <= 6) {
+      tableSizes[size].played++;
+      if (won) tableSizes[size].won++;
+    }
+    const loc = locByGame[p.game_id];
+    if (loc) { playedLocs.add(loc); if (won) wonLocs.add(loc); }
+  }
+  return {
+    tableSizes,
+    volume:    { games: games_, wins: wins_ },
+    locations: { played: playedLocs.size, won: wonLocs.size },
+  };
+}
+
+function countGlobalAchievements(g) {
+  let earned = 0, total = 0;
+  // Table sizes: a single binary play-all + win-all (across 2p–6p).
+  const sizes = [2, 3, 4, 5, 6];
+  total += 2;
+  if (sizes.every(s => g.tableSizes[s].played > 0)) earned++;
+  if (sizes.every(s => g.tableSizes[s].won    > 0)) earned++;
+  total += VOLUME_TIERS.length * 2;
+  const vg = _tierIndex(g.volume.games, VOLUME_TIERS); if (vg >= 0) earned += vg + 1;
+  const vw = _tierIndex(g.volume.wins,  VOLUME_TIERS); if (vw >= 0) earned += vw + 1;
+  total += ACH_TIERS.length * 2;
+  const lp = _tierIndex(g.locations.played, ACH_TIERS); if (lp >= 0) earned += lp + 1;
+  const lw = _tierIndex(g.locations.won,    ACH_TIERS); if (lw >= 0) earned += lw + 1;
+  return { earned, total };
+}
+
+function renderGlobalStripHTML(global, onlyEarned = false, onClickFn = '_showGlobalDetail') {
+  const tile = (key, badge, playCount, playTiers, winCount, winTiers) => {
+    const earned  = _tierIndex(playCount, playTiers) >= 0 || _tierIndex(winCount, winTiers) >= 0;
+    if (onlyEarned && !earned) return '';
+    // Crowned when both tracks reach their top tier (fully completed).
+    const crowned = _tierIndex(playCount, playTiers) === playTiers.length - 1
+                 && _tierIndex(winCount,  winTiers)  === winTiers.length  - 1;
+    // Grayed out when no achievement is earned yet on either track.
+    return `
+      <button class="ach-tile${crowned ? ' crowned' : ''}${earned ? '' : ' dim'}" type="button" data-gl="${key}" onclick="${onClickFn}(this.dataset.gl)">
+        <span class="ach-tile-imgwrap"><span class="gl-badge gl-badge-emoji">${badge}</span></span>
+        <div class="ach-tile-medals">
+          <span aria-label="Plays">${tierMedalHTML(playCount, playTiers, 'medal')}</span>
+          <span aria-label="Wins">${tierMedalHTML(winCount, winTiers, 'cup')}</span>
+        </div>
+      </button>`;
+  };
+  const sizes     = [2, 3, 4, 5, 6];
+  const playedAll = sizes.every(s => global.tableSizes[s].played > 0);
+  const wonAll    = sizes.every(s => global.tableSizes[s].won > 0);
+  const tiles = [
+    tile('volume',    '👤', global.volume.games,     VOLUME_TIERS, global.volume.wins,   VOLUME_TIERS),
+    tile('tables',    '👥', playedAll ? 1 : 0,       DONE_TIER,    wonAll ? 1 : 0,       DONE_TIER),
+    tile('locations', '📍', global.locations.played, ACH_TIERS,    global.locations.won, ACH_TIERS),
+  ];
+  return `<div class="ach-grid">${tiles.join('')}</div>`;
+}
+
+function renderGlobalDetailHTML(key, global) {
+  const tierTrack = (count, tiers, label, icon) => `
+    <div class="ach-track">
+      <div class="ach-track-label">${label} | ${count}</div>
+      ${tiers.map((t, i) => {
+        const earned = i <= _tierIndex(count, tiers);
+        return `<div class="ach-track-tier${earned ? ' earned' : ''}">
+          <span class="ach-track-icon">${earned ? icon : '·'}</span>
+          <span class="ach-track-name">${t.label} | ${t.threshold}</span>
+          <span class="ach-track-status">${earned ? 'Earned' : `${count} / ${t.threshold}`}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  if (key === 'volume') {
+    return `
+      <div class="ach-detail-head"><div class="ach-detail-name">👤 Volume</div></div>
+      ${tierTrack(global.volume.games, VOLUME_TIERS, 'Games played', '⭐')}
+      ${tierTrack(global.volume.wins,  VOLUME_TIERS, 'Wins',         '🏆')}`;
+  }
+  if (key === 'locations') {
+    return `
+      <div class="ach-detail-head"><div class="ach-detail-name">📍 Locations</div></div>
+      ${tierTrack(global.locations.played, ACH_TIERS, 'Distinct locations played', '⭐')}
+      ${tierTrack(global.locations.won,    ACH_TIERS, 'Distinct locations won',    '🏆')}`;
+  }
+  if (key === 'tables') {
+    const sizes     = [2, 3, 4, 5, 6];
+    const playedAll = sizes.every(s => global.tableSizes[s].played > 0);
+    const wonAll    = sizes.every(s => global.tableSizes[s].won > 0);
+    const trackRow = (done, label, icon) => `
+      <div class="ach-track-tier${done ? ' earned' : ''}">
+        <span class="ach-track-icon">${done ? icon : '·'}</span>
+        <span class="ach-track-name">${label}</span>
+        <span class="ach-track-status">${done ? 'Earned' : 'Not yet'}</span>
+      </div>`;
+    const sizeRows = sizes.map(s => {
+      const ts = global.tableSizes[s];
+      return `
+        <div class="box-detail-char">
+          <span class="box-detail-char-name">${s} players</span>
+          <span class="box-detail-marks">
+            <span class="${ts.played > 0 ? 'on' : ''}">${ts.played > 0 ? '⭐' : '·'}</span>
+            <span class="${ts.won  > 0 ? 'on' : ''}">${ts.won  > 0 ? '🏆' : '·'}</span>
+          </span>
+        </div>`;
+    }).join('');
+    return `
+      <div class="ach-detail-head"><div class="ach-detail-name">👥 Table sizes</div></div>
+      <div class="ach-track">
+        ${trackRow(playedAll, 'Played every size (2–6p)', '⭐')}
+        ${trackRow(wonAll,    'Won every size (2–6p)',    '🏆')}
+      </div>
+      <div class="box-detail-list">${sizeRows}</div>`;
+  }
+  return '';
+}
+
 function renderAchievementsGridHTML(charAch, allChars, onClickFn = '_showAchDetail') {
   const topMedal = (count, kind) => {
     const t = achTierFor(count);
@@ -651,16 +896,18 @@ function renderAchievementsGridHTML(charAch, allChars, onClickFn = '_showAchDeta
   };
   const tiles = allChars.map(c => {
     const stats = charAch.get(c.name) || { plays: 0, wins: 0 };
+    // Crown a character that has reached the top (gold) tier on BOTH plays and wins.
+    const goldIdx   = ACH_TIERS.length - 1;
+    const bothGold  = achTierFor(stats.plays) === goldIdx && achTierFor(stats.wins) === goldIdx;
     return `
-      <button class="ach-tile" data-char="${_esc(c.name)}" onclick="${onClickFn}(this.dataset.char)" type="button" title="${_esc(c.name)}">
-        <div class="ach-tile-main">
+      <button class="ach-tile${bothGold ? ' crowned' : ''}${(stats.plays === 0 && stats.wins === 0) ? ' dim' : ''}" data-char="${_esc(c.name)}" onclick="${onClickFn}(this.dataset.char)" type="button" title="${_esc(c.name)}">
+        <span class="ach-tile-imgwrap">
           <img class="ach-tile-img" src="${charImgSrc(c.name)}" onerror="this.src='asset/players/default.svg'" alt="${_esc(c.name)}">
-          <div class="ach-tile-rows">
-            <div class="ach-tile-row" aria-label="Plays">${topMedal(stats.plays, 'medal')}</div>
-            <div class="ach-tile-row" aria-label="Wins">${topMedal(stats.wins, 'cup')}</div>
-          </div>
+        </span>
+        <div class="ach-tile-medals">
+          <span aria-label="Plays">${topMedal(stats.plays, 'medal')}</span>
+          <span aria-label="Wins">${topMedal(stats.wins, 'cup')}</span>
         </div>
-        <div class="ach-tile-name"><span class="ach-tile-name-text">${_fmtAchTileName(c.name)}</span></div>
       </button>`;
   }).join('');
   return `
@@ -669,6 +916,8 @@ function renderAchievementsGridHTML(charAch, allChars, onClickFn = '_showAchDeta
 
 function renderAchievementDetailHTML(charName, stats) {
   stats = stats || { plays: 0, wins: 0 };
+  const goldIdx  = ACH_TIERS.length - 1;
+  const bothGold = achTierFor(stats.plays) === goldIdx && achTierFor(stats.wins) === goldIdx;
   const track = (count, label, verb, kind) => {
     const tier = achTierFor(count);
     const isCup = kind === 'cup';
@@ -692,7 +941,7 @@ function renderAchievementDetailHTML(charName, stats) {
       </div>`;
   };
   return `
-    <div class="ach-detail-head">
+    <div class="ach-detail-head${bothGold ? ' crowned' : ''}">
       <img class="char-portrait identity-portrait" src="${charImgSrc(charName)}" onerror="this.src='asset/players/default.svg'" alt="">
       <div class="ach-detail-name">${_esc(charName)}</div>
     </div>

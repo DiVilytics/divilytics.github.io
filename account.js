@@ -6,6 +6,7 @@ let _acctFallback   = 'asset/players/default.svg';
 let _acctBoxInfo    = {};
 let _acctOwnedBoxes = new Set();
 let _acctAch        = new Map();
+let _acctGlobal     = null;   // profile-wide achievements (table sizes / volume / locations)
 let _acctIdentities = [];   // list of { provider, identity_id, email, last_sign_in_at, ... }
 
 // Providers we support, in display order. Keep in sync with sign-in.html.
@@ -24,12 +25,15 @@ async function init() {
     loadCharacters(),
     loadBoxInfo(),
     db.from('profile_boxes').select('box').eq('user_id', user.id),
-    db.from('game_players').select('character, is_winner').eq('user_id', user.id),
+    db.from('game_players').select('game_id, character, is_winner').eq('user_id', user.id),
   ]);
   _acctChars      = chars;
   _acctBoxInfo    = boxInfo;
   _acctOwnedBoxes = new Set((ownedRes.data || []).map(r => r.box));
-  _acctAch        = computeCharacterAchievements(gpRes.data || []);
+  const myGp      = gpRes.data || [];
+  _acctAch        = computeCharacterAchievements(myGp);
+  const { games, players } = await fetchGamesWithPlayers([...new Set(myGp.map(r => r.game_id))]);
+  _acctGlobal     = computeGlobalAchievements(games, players, p => p.user_id === user.id);
   await _loadIdentities();
   _renderPage();
 }
@@ -70,7 +74,9 @@ function _renderPage() {
       <div class="acct-identity">
         <span id="acctAvatarPreviewWrap"></span>
         <div class="acct-identity-info">
-          <div class="acct-nick">${_esc(_acctNick || '—')}</div>
+          <div class="acct-nick">${_acctNick
+            ? `<a class="acct-nick-link" href="player.html?nick=${encodeURIComponent(_acctNick)}" title="View my player page">${_esc(_acctNick)}</a>`
+            : '—'}</div>
           ${metaLn ? `<div class="pf-since">${_esc(metaLn)}</div>` : ''}
           <button class="btn btn-ghost btn-sm acct-change-nick" onclick="changeNickname()">Change nickname</button>
         </div>
@@ -100,10 +106,20 @@ function _renderPage() {
 
     <div class="acct-section">
       ${(() => {
-        const { earned, total } = countAchievements(_acctAch, _acctChars);
-        return `<div class="section-label">My Achievements · ${earned} / ${total}</div>`;
+        const ch  = countAchievements(_acctAch, _acctChars);
+        const box = computeBoxCompletion(_acctAch, _acctChars, _acctBoxInfo);
+        const bc  = countBoxAchievements(box);
+        const gc  = _acctGlobal ? countGlobalAchievements(_acctGlobal) : { earned: 0, total: 0 };
+        return `
+          <div class="section-label">My Achievements · ${ch.earned + bc.earned + gc.earned} / ${ch.total + bc.total + gc.total}</div>
+          ${_acctGlobal ? `
+            <div class="ach-group-label">Global · ${gc.earned} / ${gc.total}</div>
+            ${renderGlobalStripHTML(_acctGlobal)}` : ''}
+          <div class="ach-group-label">Boxes · ${bc.earned} / ${bc.total}</div>
+          ${renderBoxStripHTML(box)}
+          <div class="ach-group-label">Characters · ${ch.earned} / ${ch.total}</div>
+          ${renderAchievementsGridHTML(_acctAch, _acctChars)}`;
       })()}
-      ${renderAchievementsGridHTML(_acctAch, _acctChars)}
     </div>
 
     <div class="acct-section">
@@ -571,6 +587,26 @@ function _showAchDetail(charName) {
   if (!body || !title) return;
   title.textContent = _acctNick ? `Achievements | ${_acctNick}` : 'Achievements';
   body.innerHTML = renderAchievementDetailHTML(charName, _acctAch.get(charName));
+  openOverlay('achOverlay');
+}
+
+function _showBoxDetail(boxName) {
+  const body = document.getElementById('achBody');
+  const title = document.getElementById('achTitle');
+  if (!body || !title) return;
+  const row = computeBoxCompletion(_acctAch, _acctChars, _acctBoxInfo).find(r => r.box === boxName);
+  if (!row) return;
+  title.textContent = _acctNick ? `Achievements | ${_acctNick}` : 'Achievements';
+  body.innerHTML = renderBoxDetailHTML(row, groupByBox(_acctChars)[boxName] || [], _acctAch);
+  openOverlay('achOverlay');
+}
+
+function _showGlobalDetail(key) {
+  const body = document.getElementById('achBody');
+  const title = document.getElementById('achTitle');
+  if (!body || !title || !_acctGlobal) return;
+  title.textContent = _acctNick ? `Achievements | ${_acctNick}` : 'Achievements';
+  body.innerHTML = renderGlobalDetailHTML(key, _acctGlobal);
   openOverlay('achOverlay');
 }
 

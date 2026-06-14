@@ -7,6 +7,8 @@ let pfCharBoxMap  = {};
 let pfAvatarUrl = null;
 let pfAllChars  = [];
 let pfAch       = new Map();
+let pfBoxInfo   = {};
+let pfGlobal    = null;
 
 let pfMode           = 'pct';   // 'pct' | 'count' | 'games'
 let pfFilter         = 'all';   // 'all' | 2..6
@@ -52,11 +54,13 @@ async function init() {
 
   document.title = `DiVilytics | ${pfNick}`;
 
-  const [chars, viewedProfile] = await Promise.all([
+  const [chars, viewedProfile, boxInfo] = await Promise.all([
     loadCharacters(),
     fetchProfile({ nickname: pfNick }, 'avatar_url, default_avatar, created_at'),
+    loadBoxInfo(),
   ]);
   pfAllChars  = chars;
+  pfBoxInfo   = boxInfo || {};
   pfAvatarUrl = resolveAvatar(viewedProfile);
   const sinceHTML = viewedProfile?.created_at
     ? `<span class="pf-since">Since ${fmtDateShort(viewedProfile.created_at)}</span>`
@@ -116,6 +120,7 @@ async function load() {
   pfGames   = games;
   pfPlayers = players;
   pfAch     = computeCharacterAchievements(players.filter(p => p.nickname === pfNick));
+  pfGlobal  = computeGlobalAchievements(games, players, p => p.nickname === pfNick);
 
   document.getElementById('pfRoot').className = '';
 
@@ -277,11 +282,23 @@ function render() {
         const s = pfAch.get(c.name);
         return s && (s.plays > 0 || s.wins > 0);
       });
-      const { earned, total } = countAchievements(pfAch, pfAllChars);
+      const ch  = countAchievements(pfAch, pfAllChars);
+      const box = computeBoxCompletion(pfAch, pfAllChars, pfBoxInfo);
+      const bc  = countBoxAchievements(box);
+      const gc  = pfGlobal ? countGlobalAchievements(pfGlobal) : { earned: 0, total: 0 };
+      // Only show boxes that have actually earned an achievement (played-all or
+      // won-all), mirroring the characters grid which only shows earned ones.
+      const earnedBoxes = box.filter(r => r.size > 0 && (r.played >= r.size || r.won >= r.size));
       return `
         <div class="pf-games-header">
-          <span class="pf-games-title">Achievements · ${earned} / ${total}</span>
+          <span class="pf-games-title">Achievements · ${ch.earned + bc.earned + gc.earned} / ${ch.total + bc.total + gc.total}</span>
         </div>
+        ${pfGlobal ? `
+          <div class="ach-group-label">Global · ${gc.earned} / ${gc.total}</div>
+          ${renderGlobalStripHTML(pfGlobal, true)}` : ''}
+        <div class="ach-group-label">Boxes · ${bc.earned} / ${bc.total}</div>
+        ${renderBoxStripHTML(earnedBoxes)}
+        <div class="ach-group-label">Characters · ${ch.earned} / ${ch.total}</div>
         ${renderAchievementsGridHTML(pfAch, playedChars)}`;
     })()}
 
@@ -408,6 +425,26 @@ function _showAchDetail(charName) {
   if (!body || !title) return;
   title.textContent = pfNick ? `Achievements | ${pfNick}` : 'Achievements';
   body.innerHTML = renderAchievementDetailHTML(charName, pfAch.get(charName));
+  openOverlay('achOverlay');
+}
+
+function _showBoxDetail(boxName) {
+  const body  = document.getElementById('achBody');
+  const title = document.getElementById('achTitle');
+  if (!body || !title) return;
+  const row = computeBoxCompletion(pfAch, pfAllChars, pfBoxInfo).find(r => r.box === boxName);
+  if (!row) return;
+  title.textContent = pfNick ? `Achievements | ${pfNick}` : 'Achievements';
+  body.innerHTML = renderBoxDetailHTML(row, groupByBox(pfAllChars)[boxName] || [], pfAch);
+  openOverlay('achOverlay');
+}
+
+function _showGlobalDetail(key) {
+  const body  = document.getElementById('achBody');
+  const title = document.getElementById('achTitle');
+  if (!body || !title || !pfGlobal) return;
+  title.textContent = pfNick ? `Achievements | ${pfNick}` : 'Achievements';
+  body.innerHTML = renderGlobalDetailHTML(key, pfGlobal);
   openOverlay('achOverlay');
 }
 

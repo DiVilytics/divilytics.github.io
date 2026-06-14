@@ -1390,6 +1390,41 @@ select:disabled {
   opacity: 0.45;
   transition: filter 0.15s, opacity 0.15s;
 }
+/* Box-completion achievements: a compact strip of covers (grayscale until the
+   box is fully played, like the box picker) with play/win gold markers. */
+.ach-group-label { font-size: 11px; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.06em; margin: 6px 0 5px; }
+.box-ach-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 8px;
+  padding: 2px 0 10px;
+}
+.box-ach { display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: inherit; }
+.box-ach-img {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: contain;
+  border-radius: var(--rs);
+  filter: grayscale(1);
+  opacity: 0.4;
+  transition: filter 0.2s, opacity 0.2s;
+}
+.box-ach.played .box-ach-img { filter: none; opacity: 1; }
+/* Won-all: a crown badge on the top-right corner of the (full-colour) cover. */
+.box-ach.won { position: relative; }
+.box-ach.won::after { content: '👑'; position: absolute; top: -4px; left: -4px; font-size: 15px; line-height: 1; }
+.box-ach-medals { display: flex; gap: 6px; font-size: 13px; line-height: 1; }
+.box-ach-medal:not(.on) { color: var(--dim); }
+
+/* Box achievement detail sheet */
+.box-detail-cover { width: 46px; aspect-ratio: 4 / 5; object-fit: contain; border-radius: var(--rs); flex-shrink: 0; }
+.box-detail-list { display: flex; flex-direction: column; margin-top: 14px; }
+.box-detail-char { display: flex; align-items: center; gap: 10px; padding: 7px 2px; border-top: 1px solid var(--border); }
+.box-detail-char .char-portrait { width: 28px; height: 28px; flex-shrink: 0; }
+.box-detail-char-name { flex: 1; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.box-detail-marks { display: flex; gap: 10px; font-size: 13px; flex-shrink: 0; }
+.box-detail-marks span:not(.on) { color: var(--dim); }
+
 .box-option-name { font-size: 12px; font-weight: 600; text-align: center; line-height: 1.2; }
 .box-option-year { font-size: 11px; }
 .box-option.selected { color: var(--text); }
@@ -1405,137 +1440,89 @@ select:disabled {
      gets the same tile size as a fully-populated grid, with blank space on the
      right instead of oversized stretched tiles. */
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
   gap: 10px;
   padding: 4px 0 8px;
 }
 .ach-tile {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  /* Pin the image row to the top so icons line up across the whole grid
-     regardless of name length; the name below fills the remaining space and
-     centres its text, so one-line names look balanced without dropping the
-     icon. min-height keeps every tile the same size. */
-  justify-content: flex-start;
-  min-height: 86px;
-  box-sizing: border-box;
-  gap: 3px;
-  background: var(--s1);
-  border: 0;
-  border-radius: var(--rs);
-  padding: 6px 6px 4px;
-  cursor: pointer;
-  font: inherit;
-  color: var(--text);
-  transition: background 0.15s;
-}
-.ach-tile-main {
-  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
+  box-sizing: border-box;
+  background: none;
+  border: 0;
+  padding: 2px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
 }
+.ach-tile-imgwrap { position: relative; display: inline-flex; line-height: 0; }
 .ach-tile-img {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
+  transition: filter 0.2s, opacity 0.2s;
 }
-.ach-tile-rows {
+/* Grayscale + dim characters with no plays and no wins (mirrors a locked box). */
+.ach-tile.dim .ach-tile-img { filter: grayscale(1); opacity: 0.4; }
+/* Crown (gold on both plays and wins) on the portrait corner, like the box badge. */
+.ach-tile.crowned .ach-tile-imgwrap::after { content: '👑'; position: absolute; top: -6px; left: -6px; font-size: 15px; line-height: 1; }
+.ach-tile-medals {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.ach-tile-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  gap: 6px;
   font-size: 13px;
   line-height: 1;
 }
-.ach-tile-name {
-  /* Fill the space under the (top-pinned) icon and centre the name in it, with
-     room for two lines so wrapping names don't change the tile height. */
-  flex: 1;
-  min-height: calc(2 * 1.35em + 1px);
-  font-size: 12px;
+/* Badge used as the "image" for global tiles (table-size number, location pin). */
+.gl-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
 }
-.ach-tile-name-text {
-  font-weight: 600;
-  /* Slightly generous line-height so descenders (g, y, p) aren't clipped by
-     the -webkit-line-clamp overflow. */
-  line-height: 1.35;
-  padding-bottom: 1px;
-  text-align: center;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
+.gl-badge-emoji { font-size: 21px; font-weight: 400; }
+.gl-badge { transition: filter 0.2s, opacity 0.2s; }
+.ach-tile.dim .gl-badge { filter: grayscale(1); opacity: 0.45; }
 .ach-row-icon { font-size: 12px; opacity: 0.7; }
 .ach-medal {
-  /* Fixed horizontal footprint so star/cup emojis line up vertically with
-     the dot used for locked slots (which is much narrower as a glyph). */
-  display: inline-block;
-  width: 1.4em;
-  text-align: center;
-  font-size: 16px;
+  font-size: 13px;
   line-height: 1;
   transition: opacity 0.15s;
 }
-/* Locked = empty slot. Renders as a CSS-drawn dot centered both axes within
-   the medal's fixed slot (text-character dots sit on the baseline, which
-   doesn't line up with the emoji glyphs). The text content from
-   ACH_EMPTY_ICON/ACH_EMPTY_MEDAL_ICON in ui.js is hidden via transparency. */
-.ach-medal.locked {
-  position: relative;
-  color: transparent;
-  filter: none;
-}
-.ach-medal.locked::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0.28em;
-  height: 0.28em;
-  border-radius: 50%;
-  background: var(--muted);
-  opacity: 0.55;
-  transform: translate(-50%, -50%);
-}
+/* Locked = empty slot: a dim middot, uniform with the box medals. */
+.ach-medal.locked { color: var(--dim); filter: none; }
 /* Cup tier tints — recolor the 🏆 emoji per tier via filters.
    The trick: grayscale flattens the emoji, then sepia + hue-rotate
    tints it toward bronze/silver/gold. Silver keeps a slight cool tint so
    it doesn't blend into the neutral-grey locked state. */
-.ach-cup.ach-cup-bronze {
-  filter: grayscale(1) sepia(1) saturate(2.2) hue-rotate(-20deg) brightness(0.85);
-}
-.ach-cup.ach-cup-silver {
-  filter: grayscale(0.85) saturate(0.7) hue-rotate(180deg) brightness(1.3) contrast(0.9);
-}
-.ach-cup.ach-cup-gold {
-  filter: grayscale(1) sepia(1) saturate(3) hue-rotate(5deg) brightness(1.05);
-}
 /* Star tier tints — same recipe as the cups so plays/wins share an aura. */
+.ach-cup.ach-cup-bronze,
 .ach-star.ach-star-bronze {
-  filter: grayscale(1) sepia(1) saturate(2.2) hue-rotate(-20deg) brightness(0.85);
+    filter: grayscale(1) sepia(1) saturate(1.8) hue-rotate(-35deg) brightness(0.75) contrast(1.1);
 }
+.ach-cup.ach-cup-silver,
 .ach-star.ach-star-silver {
   filter: grayscale(0.85) saturate(0.7) hue-rotate(180deg) brightness(1.3) contrast(0.9);
 }
+.ach-cup.ach-cup-gold,
 .ach-star.ach-star-gold {
-  filter: grayscale(1) sepia(1) saturate(3) hue-rotate(5deg) brightness(1.05);
+  filter: grayscale(1) sepia(1) saturate(3.5) hue-rotate(12deg) brightness(1.15) contrast(1.05);
 }
+
 @media (hover: hover) {
-  .ach-tile:hover { background: var(--s2); }
+  .ach-tile:hover .ach-tile-img,
+  .ach-tile:hover .gl-badge { filter: none; opacity: 0.85; }
 }
 
 .ach-detail-head {
@@ -1544,6 +1531,8 @@ select:disabled {
   gap: 12px;
   margin-bottom: 14px;
 }
+.ach-detail-head.crowned { position: relative; }
+.ach-detail-head.crowned::after { content: '👑'; position: absolute; top: -6px; left: -6px; font-size: 17px; line-height: 1; }
 .ach-detail-name { font-size: 18px; font-weight: 700; }
 .ach-track {
   background: var(--s1);
@@ -1593,6 +1582,7 @@ select:disabled {
 }
 @media (hover: hover) {
   .box-option:hover img { filter: none; opacity: 0.85; }
+  .box-ach:hover .box-ach-img { filter: none; opacity: 0.85; }
 }
 
 .draw-mode-row {
@@ -2379,6 +2369,7 @@ select:disabled {
 }
 .acct-identity-info { display: flex; flex-direction: column; gap: 4px; }
 .acct-nick { font-size: 20px; font-weight: 700; color: var(--text); }
+.acct-nick-link { color: inherit; text-decoration: none; }
 .acct-change-nick { align-self: flex-start; margin-top: 6px; }
 
 .acct-section {
@@ -2527,6 +2518,7 @@ select:disabled {
   .row-sub-link:hover                       { text-decoration: underline; color: var(--muted); }
   .pf-since-link:hover                      { text-decoration: underline; text-underline-offset: 2px; color: var(--muted); }
   .home-ack-card a:hover                    { text-decoration: underline; }
+  .acct-nick-link:hover                     { text-decoration: underline; text-underline-offset: 2px; }
   .lb-row:hover                             { background: var(--s2); }
   .pf-identity:hover                        { opacity: 1; }
   .live-btn:hover                           { background: var(--s3); border-color: var(--s4); }
