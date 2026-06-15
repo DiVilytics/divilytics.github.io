@@ -406,12 +406,12 @@ function shuffleOrder() {
   // Slot-machine shuffle: every row flashes through random orderings — each frame
   // a fresh permutation, so it reads as a genuine all-over shuffle — with each
   // character carrying its previous number, then settles on the real result
-  // (numbers back in ascending order). Blue .spinning highlight throughout, a
-  // fixed duration, paced slower than the 1s draw.
+  // (numbers back in ascending order). Blue .spinning highlight throughout. Same
+  // total length as the draw, but fewer, longer-held frames so it feels slower.
   slotEls.forEach(el => el.classList.add('spinning'));
 
-  const FRAME_MS = 70;                          // slower flicker than the draw's 50ms
-  const total    = Math.round(1400 / FRAME_MS); // ~1.4s, slower than the 1s draw
+  const FRAME_MS = 100;                         // longer hold per frame than the draw's 50ms
+  const total    = Math.round(1000 / FRAME_MS); // 1s total — same as the draw, fewer frames
   let ticks = 0;
   _shuffleTimer = setInterval(() => {
     ticks++;
