@@ -271,7 +271,7 @@ function _buildAvatarPicker() {
 // written to the profile when the user presses "Use this icon".
 function _renderPreview() {
   const host = document.getElementById('acctAvatarPreviewWrap');
-  if (host) host.innerHTML = avatarHTML(_pendingAvatar || _acctFallback, { cls: 'acct-identity-avatar', fallback: _acctFallback });
+  if (host) host.innerHTML = avatarHTML(_pendingAvatar || _acctFallback, { cls: 'acct-identity-avatar', extraClass: 'zoomable', fallback: _acctFallback, lightbox: true });
 }
 
 // Clicking a preset previews it (highlights it + shows it large) but does not
@@ -350,57 +350,22 @@ async function commitAvatar() {
   }
 }
 
-// Keep the "Use default icon" button's disabled state in sync with whether
-// a custom avatar is currently set.
+// "Default" stages the default icon as a pending selection (like clicking a
+// preset); Apply commits it. Disabled once the preview is already the default —
+// i.e. there's nothing left to clear.
 function _syncRemoveBtn() {
   const btn = document.getElementById('removeAvatarBtn');
-  // Available whenever the current avatar isn't the default — whether that's a
-  // saved avatar or just an uncommitted preview (build/random/preset).
-  if (btn) btn.disabled = !_pendingAvatar && !_acctAvatar;
+  if (btn) btn.disabled = !_pendingAvatar;
 }
 
+// Preview the default icon. No DB write — Apply persists it, matching every
+// other control in the editor (presets, build, random).
 function removeAvatar() {
-  _doRemoveAvatar();
-}
-
-async function _doRemoveAvatar() {
-  const user = getCurrentUser();
-  if (!user) return;
-
-  // Nothing saved (committed avatar is already the default): the Default button
-  // only needs to discard the uncommitted preview — no DB write.
-  if (!_acctAvatar) {
-    _pendingAvatar = null;
-    document.querySelectorAll('#avatarPicker .avatar-option').forEach(el => el.classList.remove('selected'));
-    _renderPreview();
-    _syncCommitBtn();   // also re-syncs the Default button
-    clearError('avatarErr');
-    return;
-  }
-
-  const btn = document.getElementById('removeAvatarBtn');
-  btn.disabled    = true;
-  btn.textContent = 'Updating…';
-  clearError('avatarErr');
-
-  const { error } = await db.from('profiles').update({ avatar_url: null }).eq('id', user.id);
-  if (error) {
-    showError('avatarErr', error.message);
-    btn.disabled    = false;
-    btn.textContent = 'Default';
-    return;
-  }
-
-  _acctAvatar = null;
   _pendingAvatar = null;
-  const profile = getCurrentProfile();
-  if (profile) profile.avatar_url = null;
   document.querySelectorAll('#avatarPicker .avatar-option').forEach(el => el.classList.remove('selected'));
   _renderPreview();
-  _syncCommitBtn();
-  _updateAuthUI();
-  btn.textContent = 'Default'; 
-  _syncRemoveBtn();
+  _syncCommitBtn();   // re-enables Apply (now differs from saved) + re-syncs Default
+  clearError('avatarErr');
 }
 
 // ── CHANGE NICKNAME ───────────────────────────────────────────────────────────

@@ -47,6 +47,13 @@
   --red-d: rgba(224, 84, 84, 0.08);
   --r: 10px;
   --rs: 6px;
+
+  /* Pace band colours — shared by the pace dots (character pages) and the
+     new-game / game-log pace swatches. */
+  --pace-green:  #4ade80;
+  --pace-yellow: #facc15;
+  --pace-orange: #fb923c;
+  --pace-red:    #e05454;
 }
 
 [data-theme="light"] {
@@ -294,10 +301,10 @@ a.chip {
   vertical-align: 1px;
   flex-shrink: 0;
 }
-.pace-dot.green  { background: #4ade80; }
-.pace-dot.yellow { background: #facc15; }
-.pace-dot.orange { background: #fb923c; }
-.pace-dot.red    { background: #e05454; }
+.pace-dot.green  { background: var(--pace-green); }
+.pace-dot.yellow { background: var(--pace-yellow); }
+.pace-dot.orange { background: var(--pace-orange); }
+.pace-dot.red    { background: var(--pace-red); }
 
 /* ── LIVE GAME PANEL ──────────────────────────────────────────────── */
 .live-status {
@@ -597,7 +604,9 @@ main {
   color: var(--muted);
 }
 
-.game-card {
+/* Shared dark panel surface — game cards and the leaderboard / stats table. */
+.game-card,
+.lb-table {
   background: var(--s1);
   border: 1px solid var(--border);
   border-radius: var(--r);
@@ -663,7 +672,9 @@ main {
 
 .chip-nick { font-size: 11px; color: var(--muted); }
 
-.chip.winner {
+/* Winner highlight — game-card chips and claim-page rows. */
+.chip.winner,
+.claim-row.winner {
   background: var(--gold-d);
   border-color: rgba(240, 165, 0, 0.28);
 }
@@ -773,7 +784,8 @@ main {
 }
 .sheet-footer-row .btn { flex: 1; }
 
-.btn:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+.btn:disabled,
+.pf-btn:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
 
 .confirm-text {
   font-size: 13px;
@@ -952,11 +964,7 @@ select optgroup { background: #1a1a1a; color: var(--muted); font-style: normal; 
   color: var(--muted);
 }
 
-.pf-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  pointer-events: none;
-}
+/* .pf-btn:disabled shares .btn:disabled (above). */
 select:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -1041,13 +1049,7 @@ select:disabled {
 .stat-val { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
 .stat-lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
-.lb-table {
-  background: var(--s1);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  overflow: hidden;
-}
-
+/* .lb-table surface is defined with .game-card (shared panel surface). */
 .lb-head,
 .lb-row {
   display: grid;
@@ -1418,7 +1420,9 @@ select:disabled {
 /* Won-all: a crown badge on the top-right corner of the (full-colour) cover. */
 .box-ach.won { position: relative; }
 .box-ach.won::after { content: '👑'; position: absolute; top: -4px; left: -4px; font-size: 15px; line-height: 1; }
-.box-ach-medals { display: flex; gap: 6px; font-size: 13px; line-height: 1; }
+/* Medal strip under achievement / box-completion tiles. */
+.box-ach-medals,
+.ach-tile-medals { display: flex; gap: 6px; font-size: 13px; line-height: 1; }
 .box-ach-medal:not(.on) { color: var(--dim); }
 
 /* Box achievement detail sheet */
@@ -1476,12 +1480,7 @@ select:disabled {
 .ach-tile.dim .ach-tile-img { filter: grayscale(1); opacity: 0.4; }
 /* Crown (gold on both plays and wins) on the portrait corner, like the box badge. */
 .ach-tile.crowned .ach-tile-imgwrap::after { content: '👑'; position: absolute; top: -6px; left: -6px; font-size: 15px; line-height: 1; }
-.ach-tile-medals {
-  display: flex;
-  gap: 6px;
-  font-size: 13px;
-  line-height: 1;
-}
+/* .ach-tile-medals shares .box-ach-medals (above). */
 /* Badge used as the "image" for global tiles (table-size number, location pin). */
 .gl-badge {
   width: 44px;
@@ -1619,10 +1618,10 @@ select:disabled {
   padding: 0;
   transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
 }
-.pace-color.green  { background: #4ade80; }
-.pace-color.yellow { background: #facc15; }
-.pace-color.orange { background: #fb923c; }
-.pace-color.red    { background: #e05454; }
+.pace-color.green  { background: var(--pace-green); }
+.pace-color.yellow { background: var(--pace-yellow); }
+.pace-color.orange { background: var(--pace-orange); }
+.pace-color.red    { background: var(--pace-red); }
 .pace-color:hover  { transform: scale(1.08); }
 /* Selection states. "primary" is the clicked colour — full colour + the black
    ring (2px border + 1px box-shadow, which Firefox renders evenly, unlike a 3px
@@ -1744,7 +1743,12 @@ select:disabled {
   font-size: 22px;
   color: var(--muted);
   line-height: 1;
+  transition: transform 0.2s;
 }
+/* Progressive enhancement: rotate the chevron while the native picker is open.
+   :open on <select> is supported in recent Chromium; the rule is a harmless
+   no-op in browsers that don't recognise it. */
+.order-slot-select:open ~ .order-slot-chevron { transform: rotate(180deg); }
 
 /* New game page footer */
 .new-game-footer {
@@ -1891,10 +1895,7 @@ select:disabled {
   border-radius: var(--r);
   padding: 10px 14px;
 }
-.claim-row.winner {
-  background: var(--gold-d);
-  border-color: rgba(240, 165, 0, 0.28);
-}
+/* .claim-row.winner shares .chip.winner (winner highlight, above). */
 .claim-row.mine { border-color: rgba(124, 106, 247, 0.4); }
 
 .claim-char { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; }

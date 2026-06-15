@@ -252,17 +252,11 @@ function render() {
   root.innerHTML = '';
 
   for (const g of glGames) {
-    const gp = (byGame[g.id] || []).slice().sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || (a.id < b.id ? -1 : 1));
+    const gp = sortGamePlayers(byGame[g.id] || []);
     root.appendChild(buildCard(g, gp));
   }
 
-  if (_hasMore) {
-    const btn = document.createElement('button');
-    btn.className = 'btn-load-more';
-    btn.textContent = 'Load more';
-    btn.onclick = () => { btn.disabled = true; load(false); };
-    root.appendChild(btn);
-  }
+  if (_hasMore) appendLoadMore(root, () => load(false));
 }
 
 function buildCard(g, gp) {

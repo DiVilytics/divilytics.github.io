@@ -329,16 +329,10 @@ function _renderGamesList(keepIds = pfFilteredGameIds()) {
   if (!list) return;
   list.innerHTML = '';
   for (const g of visible) {
-    const gp = pfPlayers.filter(p => p.game_id === g.id).sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || (a.id < b.id ? -1 : 1));
+    const gp = sortGamePlayers(pfPlayers.filter(p => p.game_id === g.id));
     list.appendChild(buildProfileCard(g, gp));
   }
-  if (hasMore) {
-    const btn = document.createElement('button');
-    btn.className = 'btn-load-more';
-    btn.textContent = 'Load more';
-    btn.onclick = () => { btn.disabled = true; pfLoadMore(); };
-    list.appendChild(btn);
-  }
+  if (hasMore) appendLoadMore(list, pfLoadMore);
 
   if (_pfScrollToId) {
     const target = _pfScrollToId;

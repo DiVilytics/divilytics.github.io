@@ -69,3 +69,22 @@ function buildGameCard(g, gp, { isSelf, actions, onLocationClick } = {}) {
   }
   return card;
 }
+
+// ── GAME LIST HELPERS ───────────────────────────────────────────────────────
+// Shared bits of the game-log / player-profile lists (the lists themselves
+// paginate differently — server-side vs client-side — so only these are shared).
+
+// A game's player rows in display order: by position, then id as a stable
+// tiebreaker. Returns a new array (never mutates the input).
+function sortGamePlayers(rows) {
+  return [...rows].sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || (a.id < b.id ? -1 : 1));
+}
+
+// Append a "Load more" button that disables itself on click, then runs onLoadMore.
+function appendLoadMore(container, onLoadMore) {
+  const btn = document.createElement('button');
+  btn.className = 'btn-load-more';
+  btn.textContent = 'Load more';
+  btn.onclick = () => { btn.disabled = true; onLoadMore(); };
+  container.appendChild(btn);
+}

@@ -328,7 +328,7 @@ function drawSlot(id) {
   slotEl.classList.add('spinning');
 
   let ticks = 0;
-  const total = 18;
+  const total = 20;   // 20 ticks × 50ms = 1s per slot
 
   slotTimers[id] = setInterval(() => {
     const pick = pool[Math.floor(Math.random() * pool.length)];
@@ -339,17 +339,29 @@ function drawSlot(id) {
     if (ticks >= total) {
       clearInterval(slotTimers[id]);
       delete slotTimers[id];
+
+      // Land this slot IN PLACE — set its character and drop only its own
+      // highlight. We deliberately don't re-render the whole list here, so the
+      // other slots keep spinning and each clears its highlight as it lands
+      // (sequentially, in the same order they started).
       const finalPool = _slotPool(id);
-      if (!finalPool.length) {
-        slotEl.classList.remove('spinning');
-        return;
+      if (finalPool.length) {
+        const final = finalPool[Math.floor(Math.random() * finalPool.length)];
+        slot.char = final.name;
+        portraitEl.src = charImgSrc(final.name);
+        if (nameEl) nameEl.textContent = final.name;
       }
-      const final = finalPool[Math.floor(Math.random() * finalPool.length)];
-      slot.char = final.name;
-      renderOrderSlots();
+      slotEl.classList.remove('spinning');
       _saveLiveState();
+
+      // Once the whole draw has settled, re-render once to refresh the selects
+      // and re-enable the buttons (nothing is spinning by then, so no flash).
+      if (Object.keys(slotTimers).length === 0) renderOrderSlots();
+      else _updateActionBtns();
     }
-  }, 55);
+  }, 50);
+
+  _updateActionBtns();   // freeze the draw/shuffle/start buttons while spinning
 }
 
 function drawAllEmpty() {
@@ -372,7 +384,11 @@ function shuffleOrder() {
   for (const id of Object.keys(slotTimers)) { clearInterval(slotTimers[id]); }
   slotTimers = {};
 
-  // Decide the final shuffled order up front (Fisher–Yates).
+  // Each player's position before this shuffle, so the spinning numbers ride
+  // along with their player as the rows jumble.
+  const origPos = new Map(orderSlots.map((s, i) => [s.id, i + 1]));
+
+  // Decide the final shuffled order up front (uniform Fisher–Yates).
   for (let i = orderSlots.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [orderSlots[i], orderSlots[j]] = [orderSlots[j], orderSlots[i]];
@@ -381,25 +397,28 @@ function shuffleOrder() {
   const container = document.getElementById('orderSlots');
   const slotEls   = container ? [...container.querySelectorAll('.order-slot')] : [];
   if (slotEls.length !== orderSlots.length) {
-    // No/odd DOM to animate — just render the result.
+    // No DOM to animate — just render the result.
     renderOrderSlots();
     _saveLiveState();
     return;
   }
 
-  // Quick "shuffling" animation: the position numbers stay put while the
-  // players' portraits/names flash through random orderings, then settle on the
-  // real result. Mirrors the draw spin (reuses the .spinning highlight/pulse).
+  // Slot-machine shuffle: every row flashes through random orderings — each frame
+  // a fresh permutation, so it reads as a genuine all-over shuffle — with each
+  // character carrying its previous number, then settles on the real result
+  // (numbers back in ascending order). Blue .spinning highlight throughout, a
+  // fixed duration, paced slower than the 1s draw.
   slotEls.forEach(el => el.classList.add('spinning'));
 
+  const FRAME_MS = 70;                          // slower flicker than the draw's 50ms
+  const total    = Math.round(1400 / FRAME_MS); // ~1.4s, slower than the 1s draw
   let ticks = 0;
-  const total = 12;
   _shuffleTimer = setInterval(() => {
     ticks++;
     if (ticks >= total) {
       clearInterval(_shuffleTimer);
       _shuffleTimer = null;
-      renderOrderSlots();   // settle on the real shuffled order (restores selects, states)
+      renderOrderSlots();   // settle: final order, ascending numbers
       _saveLiveState();
       return;
     }
@@ -412,10 +431,14 @@ function shuffleOrder() {
       const s        = perm[idx];
       const portrait = el.querySelector('.order-slot-portrait');
       const nameEl   = el.querySelector('.order-slot-name');
+      const numEl    = el.querySelector('.row-num');
       if (portrait) portrait.src = s.char ? charImgSrc(s.char) : 'asset/players/default.svg';
       if (nameEl)   nameEl.textContent = s.char || '— Character —';
+      if (numEl)    numEl.textContent = origPos.get(s.id) + '.';
     });
-  }, 50);
+  }, FRAME_MS);
+
+  _updateActionBtns();   // freeze the draw/shuffle/start buttons while spinning
 }
 
 function renderOrderSlots() {
@@ -462,6 +485,11 @@ function renderOrderSlots() {
 }
 
 function _updateActionBtns() {
+  // While a draw or shuffle is animating, hold the draw/shuffle/start/save
+  // buttons disabled — so they don't flicker as slots fill in one by one, and
+  // can't be re-triggered mid-animation. They're recomputed once it settles.
+  const animating = !!_shuffleTimer || Object.keys(slotTimers).length > 0;
+
   const filled     = orderSlots.filter(s => s.char).length;
   const empties    = orderSlots.length - filled;
 
@@ -472,16 +500,16 @@ function _updateActionBtns() {
   const submitBtn       = document.getElementById('submitBtn');
 
   if (drawAllEmptyBtn) {
-    drawAllEmptyBtn.disabled = empties === 0;
-    drawAllEmptyBtn.title    = empties === 0 ? 'All slots are filled' : '';
+    drawAllEmptyBtn.disabled = animating || empties === 0;
+    drawAllEmptyBtn.title    = animating ? '' : (empties === 0 ? 'All slots are filled' : '');
   }
   if (drawAllBtn) {
-    drawAllBtn.disabled = false;
+    drawAllBtn.disabled = animating;
     drawAllBtn.title    = '';
   }
   if (shuffleBtn) {
-    shuffleBtn.disabled = filled < 2;
-    shuffleBtn.title    = filled < 2 ? 'Pick at least 2 characters first' : '';
+    shuffleBtn.disabled = animating || filled < 2;
+    shuffleBtn.title    = animating ? '' : (filled < 2 ? 'Pick at least 2 characters first' : '');
   }
   // Start lights up once the lineup is complete — every player has a different
   // character and "me" is marked. Save additionally needs the winner marked.
@@ -490,8 +518,8 @@ function _updateActionBtns() {
   const lineupErr = _validateLineup();                     // null = ready to start
   const hasWinner = orderSlots.some(s => s.isWinner);
   const saveErr   = lineupErr || (hasWinner ? null : 'Mark the winner with 👑.');
-  if (startBtn)  { startBtn.disabled  = !!lineupErr; startBtn.title  = lineupErr || ''; }
-  if (submitBtn) { submitBtn.disabled = !!saveErr;   submitBtn.title = saveErr   || ''; }
+  if (startBtn)  { startBtn.disabled  = animating || !!lineupErr; startBtn.title  = animating ? '' : (lineupErr || ''); }
+  if (submitBtn) { submitBtn.disabled = animating || !!saveErr;   submitBtn.title = animating ? '' : (saveErr   || ''); }
 }
 
 // ── DRAG TO REORDER ───────────────────────────────────────────────────────────
