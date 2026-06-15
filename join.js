@@ -196,31 +196,6 @@ async function saveGameDetails() {
 
 // ── CLAIM ─────────────────────────────────────────────────────────────────────
 
-let _pendingClaimId = null;
-
-function _ensureClaimConfirmModal() {
-  if (document.getElementById('claimConfirmOverlay')) return;
-  const tpl = document.createElement('div');
-  tpl.innerHTML = `
-    <div class="overlay" id="claimConfirmOverlay" onclick="if(event.target===this) cancelClaim()">
-      <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-header">
-          <h3>Confirm your character</h3>
-          <button class="sheet-close" onclick="cancelClaim()">×</button>
-        </div>
-        <div class="sheet-body">
-          <p class="confirm-text">You're about to claim <strong id="claimConfirmChar" class="text-emph"></strong> in this game. Picked the wrong one? You can release it afterwards.</p>
-        </div>
-        <div class="sheet-footer sheet-footer-row">
-          <button class="btn btn-ghost"   onclick="cancelClaim()">Cancel</button>
-          <button class="btn btn-primary" id="claimConfirmBtn" onclick="confirmClaim()">Claim character</button>
-        </div>
-      </div>
-    </div>`;
-  document.body.appendChild(tpl.firstElementChild);
-}
-
 function claimCharacter(playerId) {
   const user    = getCurrentUser();
   const profile = getCurrentProfile();
@@ -233,32 +208,20 @@ function claimCharacter(playerId) {
   // If it got claimed out from under us, refresh
   if (player.user_id) { init(); return; }
 
-  _ensureClaimConfirmModal();
-  _pendingClaimId = playerId;
-  document.getElementById('claimConfirmChar').innerHTML = charImgHTML(player.character) + _esc(player.character);
-  const btn = document.getElementById('claimConfirmBtn');
-  btn.disabled    = false;
-  btn.textContent = 'Claim character';
-  openOverlay('claimConfirmOverlay');
+  openConfirmSheet({
+    id:           'claimConfirmOverlay',
+    title:        'Confirm your character',
+    bodyHTML:     `<p class="confirm-text">You're about to claim <strong class="text-emph">${charImgHTML(player.character)}${_esc(player.character)}</strong> in this game. Picked the wrong one? You can release it afterwards.</p>`,
+    confirmLabel: 'Claim character',
+    busyLabel:    'Claiming…',
+    onConfirm:    () => _doClaim(playerId),
+  });
 }
 
-function cancelClaim() {
-  _pendingClaimId = null;
-  const el = document.getElementById('claimConfirmOverlay');
-  if (el) closeOverlay('claimConfirmOverlay');
-}
-
-async function confirmClaim() {
-  if (!_pendingClaimId) return;
+async function _doClaim(playerId) {
   const user    = getCurrentUser();
   const profile = getCurrentProfile();
-  if (!user || !profile) { cancelClaim(); return; }
-
-  const playerId = _pendingClaimId;
-
-  const btn = document.getElementById('claimConfirmBtn');
-  btn.disabled    = true;
-  btn.textContent = 'Claiming…';
+  if (!user || !profile) return;
 
   const { error } = await db
     .from('game_players')
@@ -266,46 +229,11 @@ async function confirmClaim() {
     .eq('id', playerId)
     .is('user_id', null);
 
-  cancelClaim();
-
-  if (error) {
-    const root = document.getElementById('claimRoot');
-    const errEl = document.createElement('div');
-    errEl.className = 'err show';
-    errEl.textContent = error.message;
-    root.prepend(errEl);
-    return;
-  }
-
+  if (error) { _showClaimRowError(error.message); return; }
   await init();
 }
 
 // ── RELEASE ───────────────────────────────────────────────────────────────────
-
-let _pendingReleaseId = null;
-
-function _ensureReleaseConfirmModal() {
-  if (document.getElementById('releaseConfirmOverlay')) return;
-  const tpl = document.createElement('div');
-  tpl.innerHTML = `
-    <div class="overlay" id="releaseConfirmOverlay" onclick="if(event.target===this) cancelRelease()">
-      <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-header">
-          <h3>Release this character?</h3>
-          <button class="sheet-close" onclick="cancelRelease()">×</button>
-        </div>
-        <div class="sheet-body">
-          <p class="confirm-text">This frees up <strong id="releaseConfirmChar" class="text-emph"></strong> so it can be claimed again — by you or another player.</p>
-        </div>
-        <div class="sheet-footer sheet-footer-row">
-          <button class="btn btn-ghost"   onclick="cancelRelease()">Cancel</button>
-          <button class="btn btn-danger" id="releaseConfirmBtn" onclick="confirmRelease()">Release</button>
-        </div>
-      </div>
-    </div>`;
-  document.body.appendChild(tpl.firstElementChild);
-}
 
 function releaseCharacter(playerId) {
   const user = getCurrentUser();
@@ -314,31 +242,20 @@ function releaseCharacter(playerId) {
   const player = claimPlayers.find(p => p.id === playerId);
   if (!player || player.user_id !== user.id) return;
 
-  _ensureReleaseConfirmModal();
-  _pendingReleaseId = playerId;
-  document.getElementById('releaseConfirmChar').innerHTML = charImgHTML(player.character) + _esc(player.character);
-  const btn = document.getElementById('releaseConfirmBtn');
-  btn.disabled    = false;
-  btn.textContent = 'Release';
-  openOverlay('releaseConfirmOverlay');
+  openConfirmSheet({
+    id:           'releaseConfirmOverlay',
+    title:        'Release this character?',
+    bodyHTML:     `<p class="confirm-text">This frees up <strong class="text-emph">${charImgHTML(player.character)}${_esc(player.character)}</strong> so it can be claimed again — by you or another player.</p>`,
+    confirmLabel: 'Release',
+    busyLabel:    'Releasing…',
+    danger:       true,
+    onConfirm:    () => _doRelease(playerId),
+  });
 }
 
-function cancelRelease() {
-  _pendingReleaseId = null;
-  const el = document.getElementById('releaseConfirmOverlay');
-  if (el) closeOverlay('releaseConfirmOverlay');
-}
-
-async function confirmRelease() {
-  if (!_pendingReleaseId) return;
+async function _doRelease(playerId) {
   const user = getCurrentUser();
-  if (!user) { cancelRelease(); return; }
-
-  const playerId = _pendingReleaseId;
-
-  const btn = document.getElementById('releaseConfirmBtn');
-  btn.disabled    = true;
-  btn.textContent = 'Releasing…';
+  if (!user) return;
 
   const { error } = await db
     .from('game_players')
@@ -346,18 +263,17 @@ async function confirmRelease() {
     .eq('id', playerId)
     .eq('user_id', user.id);
 
-  cancelRelease();
-
-  if (error) {
-    const root = document.getElementById('claimRoot');
-    const errEl = document.createElement('div');
-    errEl.className = 'err show';
-    errEl.textContent = error.message;
-    root.prepend(errEl);
-    return;
-  }
-
+  if (error) { _showClaimRowError(error.message); return; }
   await init();
+}
+
+// Surface a claim/release failure as a banner at the top of the page.
+function _showClaimRowError(msg) {
+  const root = document.getElementById('claimRoot');
+  const errEl = document.createElement('div');
+  errEl.className = 'err show';
+  errEl.textContent = msg;
+  root.prepend(errEl);
 }
 
 // ── ERROR ─────────────────────────────────────────────────────────────────────

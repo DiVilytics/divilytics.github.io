@@ -85,6 +85,11 @@
 /* Page header that aligns its right-side controls to the top instead of center. */
 .page-header.align-top { align-items: flex-start; }
 
+/* Reserve the standard control height (38px input) so a search box that only
+   appears after data loads (the game log location filter) doesn't grow the
+   header and shift the title down on first render. */
+.page-header.has-search-control { min-height: 38px; }
+
 /* Char detail-page identity portrait (40px). Compound selector wins against
    the later `.char-portrait` rule (18px) when both classes are applied. */
 .identity-portrait,

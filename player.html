@@ -103,29 +103,19 @@
   </div>
 </div>
 
-<!-- Delete game confirmation -->
-<div class="overlay" id="pfDeleteGameOverlay" onclick="if(event.target===this) pfCancelDeleteGame()">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-header">
-      <h3>Delete Game?</h3>
-      <button class="sheet-close" onclick="pfCancelDeleteGame()">×</button>
-    </div>
-    <div class="sheet-body">
-      <p class="confirm-text">This will permanently delete the game and all player records. This action cannot be undone.</p>
-    </div>
-    <div class="sheet-footer sheet-footer-row">
-      <button class="btn btn-ghost" onclick="pfCancelDeleteGame()">Cancel</button>
-      <button class="btn btn-danger" onclick="pfConfirmDeleteGame()">Delete Game</button>
-    </div>
-  </div>
-</div>
+<!-- The delete-game confirmation sheet is injected on demand by openConfirmSheet (ui.js). -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="config.js"></script>
 <script src="db.js"></script>
+  <script src="theme.js"></script>
   <script src="ui.js"></script>
+  <script src="avatar.js"></script>
+  <script src="achievements.js"></script>
+  <script src="stats-table.js"></script>
+  <script src="search.js"></script>
+  <script src="game-card.js"></script>
   <script src="shared.js"></script>
 <script src="player.js"></script>
 </body>

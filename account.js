@@ -63,6 +63,11 @@ function _renderPage() {
   _pendingAvatar = _acctAvatar;
   _acctFallback  = profile?.default_avatar || 'asset/players/default.svg';
 
+  setAchievementsContext({
+    ach: _acctAch, chars: _acctChars, boxInfo: _acctBoxInfo, global: _acctGlobal,
+    title: _acctNick ? `Achievements | ${_acctNick}` : 'Achievements',
+  });
+
   const metaLn = profile?.created_at ? `Since ${fmtDateShort(profile.created_at)}` : null;
 
   const root = document.getElementById('acctRoot');
@@ -105,21 +110,12 @@ function _renderPage() {
     </div>
 
     <div class="acct-section">
-      ${(() => {
-        const ch  = countAchievements(_acctAch, _acctChars);
-        const box = computeBoxCompletion(_acctAch, _acctChars, _acctBoxInfo);
-        const bc  = countBoxAchievements(box);
-        const gc  = _acctGlobal ? countGlobalAchievements(_acctGlobal) : { earned: 0, total: 0 };
-        return `
-          <div class="section-label">My Achievements · ${ch.earned + bc.earned + gc.earned} / ${ch.total + bc.total + gc.total}</div>
-          ${_acctGlobal ? `
-            <div class="ach-group-label">Global · ${gc.earned} / ${gc.total}</div>
-            ${renderGlobalStripHTML(_acctGlobal)}` : ''}
-          <div class="ach-group-label">Boxes · ${bc.earned} / ${bc.total}</div>
-          ${renderBoxStripHTML(box)}
-          <div class="ach-group-label">Characters · ${ch.earned} / ${ch.total}</div>
-          ${renderAchievementsGridHTML(_acctAch, _acctChars)}`;
-      })()}
+      ${achievementsSectionHTML({
+        ach: _acctAch, chars: _acctChars, boxInfo: _acctBoxInfo, global: _acctGlobal,
+        // The account page shows every achievement, earned or not.
+        onlyEarned: false,
+        header: (earned, total) => `<div class="section-label">My Achievements · ${earned} / ${total}</div>`,
+      })}
     </div>
 
     <div class="acct-section">
@@ -139,7 +135,8 @@ function _renderPage() {
   `;
 
   _buildAvatarPicker();
-  _buildAvatarBuilder();
+  avatarBuilder.configure({ getSavedAvatar: () => _acctAvatar, onPreview: _previewBuild });
+  avatarBuilder.build('avatarPaneBuilder');
   _buildBoxPicker();
 }
 
@@ -290,7 +287,7 @@ function _previewAvatar(value) {
 
 // Preview the in-progress build (clears any preset highlight, since it's a build).
 function _previewBuild() {
-  _pendingAvatar = _builderRecipe();
+  _pendingAvatar = avatarBuilder.recipe();
   document.querySelectorAll('#avatarPicker .avatar-option').forEach(el => el.classList.remove('selected'));
   _renderPreview();
   _syncCommitBtn();
@@ -307,130 +304,15 @@ function _syncCommitBtn() {
 function randomizeAvatar() {
   const builderPane = document.getElementById('avatarPaneBuilder');
   if (builderPane && !builderPane.hidden) {
-    _randomizeBuilder();
+    avatarBuilder.randomize();
   } else {
     _previewAvatar(`asset/players/${1 + Math.floor(Math.random() * 19)}.jpeg`);
   }
 }
 
-// ── AVATAR BUILDER ───────────────────────────────────────────────────────────
-// Compose a player icon by picking one transparent PNG part per body slot over
-// a background colour. The body parts, their draw order and per-part option
-// counts live in AVATAR_BUILDER (ui.js) — the same config the renderer uses, so
-// the builder and every display point can never drift. Saving stores a compact
-// recipe string in avatar_url; avatarHTML() composes it on the fly everywhere.
-// The live preview here uses that same render path (no rasterisation anywhere).
-// Disney Villainous jewel tones — villain signature colours over a dark, moody
-// base (Maleficent purple/green, Ursula teal, Jafar/Hook crimson, Prince John
-// gold, Hades blue, the black-and-gold box).
-const AVATAR_BG_SWATCHES = ['#4a1d6e', '#6b2d8c', '#7d1f3f', '#a01515', '#b8621b', '#c9a227', '#1f7a4d', '#0e5c6b', '#15182e'];
-const AVATAR_BUILDER_LS  = 'divilytics:avatarBuilder';
-
-let _builderSel = {};
-let _builderBg  = AVATAR_BUILDER.defaultBg;
-
-// Seed the builder from the saved avatar if it's already a recipe, else from
-// the last edit kept in localStorage, else defaults.
-function _loadBuilderState() {
-  const fromRecipe = parseAvatarRecipe(_acctAvatar);
-  let saved = null;
-  if (!fromRecipe) {
-    try { saved = JSON.parse(localStorage.getItem(AVATAR_BUILDER_LS) || 'null'); } catch (_) {}
-  }
-  _builderSel = {};
-  for (const part of AVATAR_BUILDER.parts) {
-    const n = fromRecipe ? fromRecipe.parts[part.key] : saved?.sel?.[part.key];
-    _builderSel[part.key] = (Number.isInteger(n) && n >= 1 && n <= part.count) ? n : 1;
-  }
-  if (fromRecipe)                                                   _builderBg = fromRecipe.bg;
-  else if (typeof saved?.bg === 'string' && /^#[0-9a-f]{6}$/i.test(saved.bg)) _builderBg = saved.bg;
-  else                                                             _builderBg = AVATAR_BUILDER.defaultBg;
-}
-
-function _saveBuilderState() {
-  try { localStorage.setItem(AVATAR_BUILDER_LS, JSON.stringify({ sel: _builderSel, bg: _builderBg })); } catch (_) {}
-}
-
-function _builderRecipe() {
-  return serializeAvatarRecipe(_builderSel, _builderBg);
-}
-
-function _buildAvatarBuilder() {
-  const pane = document.getElementById('avatarPaneBuilder');
-  if (!pane) return;
-  _loadBuilderState();
-
-  const rows = AVATAR_BUILDER.parts.map(part => `
-    <div class="builder-row" data-key="${part.key}">
-      <span class="builder-row-label">${part.label}</span>
-      <div class="builder-stepper">
-        <button class="cs-month-nav" type="button" onclick="_cyclePart('${part.key}', -1)" ${part.count < 2 ? 'disabled' : ''} aria-label="Previous ${part.label}">‹</button>
-        <span class="builder-count"><span class="builder-num">${_builderSel[part.key]}</span> / ${part.count}</span>
-        <button class="cs-month-nav" type="button" onclick="_cyclePart('${part.key}', 1)" ${part.count < 2 ? 'disabled' : ''} aria-label="Next ${part.label}">›</button>
-      </div>
-    </div>`).join('');
-
-  const swatches = AVATAR_BG_SWATCHES.map(c =>
-    `<button class="builder-swatch${c === _builderBg ? ' selected' : ''}" type="button" data-color="${c}" style="background:${c}" onclick="_setBg('${c}')" aria-label="Background ${c}"></button>`
-  ).join('');
-
-  pane.innerHTML = `
-    <div class="builder-wrap">
-      <div class="builder-controls">
-        ${rows}
-        <div class="builder-row builder-row-bg">
-          <span class="builder-row-label">Background</span>
-          <div class="builder-swatches">
-            ${swatches}
-            <label class="builder-swatch builder-swatch-custom" title="Custom colour">
-              <input type="color" id="builderBgInput" value="${_builderBg}" oninput="_setBg(this.value)">
-            </label>
-          </div>
-        </div>
-      </div>
-    </div>`;
-  // The Randomize / "Use this icon" actions live in the toolbar above (shared
-  // with Presets); the build is previewed when its tab opens.
-}
-
-function _cyclePart(key, dir) {
-  const part = AVATAR_BUILDER.parts.find(p => p.key === key);
-  if (!part || part.count < 2) return;
-  _builderSel[key] = ((_builderSel[key] - 1 + dir + part.count) % part.count) + 1;
-  const row = document.querySelector(`.builder-row[data-key="${key}"] .builder-num`);
-  if (row) row.textContent = _builderSel[key];
-  _saveBuilderState();
-  _previewBuild();
-}
-
-// Roll a random part for every slot and a random villain background, then sync
-// the steppers, swatches and preview (without persisting a new avatar — the
-// user still confirms with "Use this icon").
-function _randomizeBuilder() {
-  for (const part of AVATAR_BUILDER.parts) {
-    _builderSel[part.key] = 1 + Math.floor(Math.random() * part.count);
-    const num = document.querySelector(`.builder-row[data-key="${part.key}"] .builder-num`);
-    if (num) num.textContent = _builderSel[part.key];
-  }
-  _builderBg = AVATAR_BG_SWATCHES[Math.floor(Math.random() * AVATAR_BG_SWATCHES.length)];
-  document.querySelectorAll('.builder-swatch[data-color]').forEach(el => {
-    el.classList.toggle('selected', el.dataset.color === _builderBg);
-  });
-  const inp = document.getElementById('builderBgInput');
-  if (inp) inp.value = _builderBg;
-  _saveBuilderState();
-  _previewBuild();
-}
-
-function _setBg(color) {
-  if (!/^#[0-9a-f]{6}$/i.test(color)) return;
-  _builderBg = color.toLowerCase();
-  document.querySelectorAll('.builder-swatch[data-color]').forEach(el => {
-    el.classList.toggle('selected', el.dataset.color === _builderBg);
-  });
-  _saveBuilderState();
-  _previewBuild();
-}
+// The avatar builder UI (compose an icon from body parts over a background) lives
+// in avatar-builder.js as the `avatarBuilder` module. It's wired to this page via
+// avatarBuilder.configure({ getSavedAvatar, onPreview }) in _renderPage().
 
 // ── AVATAR ACTIONS ───────────────────────────────────────────────────────────
 
@@ -579,38 +461,9 @@ async function confirmDeleteAccount() {
   location.href = 'index.html';
 }
 
-// ── ACHIEVEMENT DETAIL ────────────────────────────────────────────────────────
-
-function _showAchDetail(charName) {
-  const body = document.getElementById('achBody');
-  const title = document.getElementById('achTitle');
-  if (!body || !title) return;
-  title.textContent = _acctNick ? `Achievements | ${_acctNick}` : 'Achievements';
-  body.innerHTML = renderAchievementDetailHTML(charName, _acctAch.get(charName));
-  openOverlay('achOverlay');
-}
-
-function _showBoxDetail(boxName) {
-  const body = document.getElementById('achBody');
-  const title = document.getElementById('achTitle');
-  if (!body || !title) return;
-  const row = computeBoxCompletion(_acctAch, _acctChars, _acctBoxInfo).find(r => r.box === boxName);
-  if (!row) return;
-  title.textContent = _acctNick ? `Achievements | ${_acctNick}` : 'Achievements';
-  body.innerHTML = renderBoxDetailHTML(row, groupByBox(_acctChars)[boxName] || [], _acctAch);
-  openOverlay('achOverlay');
-}
-
-function _showGlobalDetail(key) {
-  const body = document.getElementById('achBody');
-  const title = document.getElementById('achTitle');
-  if (!body || !title || !_acctGlobal) return;
-  title.textContent = _acctNick ? `Achievements | ${_acctNick}` : 'Achievements';
-  body.innerHTML = renderGlobalDetailHTML(key, _acctGlobal);
-  openOverlay('achOverlay');
-}
-
-function _closeAchOverlay() { closeOverlay('achOverlay'); }
+// The achievement detail overlay handlers (_showAchDetail / _showBoxDetail /
+// _showGlobalDetail / _closeAchOverlay) are shared from achievements.js and read
+// the context set via setAchievementsContext() in _renderPage().
 
 // ── LINKED IDENTITIES ─────────────────────────────────────────────────────────
 

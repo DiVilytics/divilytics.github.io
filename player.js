@@ -247,6 +247,11 @@ function render() {
   }
   const charRows = Object.values(charMap);
 
+  setAchievementsContext({
+    ach: pfAch, chars: pfAllChars, boxInfo: pfBoxInfo, global: pfGlobal,
+    title: pfNick ? `Achievements | ${pfNick}` : 'Achievements',
+  });
+
   root.innerHTML = `
     <div class="summary">
       ${statBoxesHTML([
@@ -277,30 +282,15 @@ function render() {
       wrapClass:   'mb-1-25',
     })}
 
-    ${(() => {
-      const playedChars = pfAllChars.filter(c => {
-        const s = pfAch.get(c.name);
-        return s && (s.plays > 0 || s.wins > 0);
-      });
-      const ch  = countAchievements(pfAch, pfAllChars);
-      const box = computeBoxCompletion(pfAch, pfAllChars, pfBoxInfo);
-      const bc  = countBoxAchievements(box);
-      const gc  = pfGlobal ? countGlobalAchievements(pfGlobal) : { earned: 0, total: 0 };
-      // Only show boxes that have actually earned an achievement (played-all or
-      // won-all), mirroring the characters grid which only shows earned ones.
-      const earnedBoxes = box.filter(r => r.size > 0 && (r.played >= r.size || r.won >= r.size));
-      return `
+    ${achievementsSectionHTML({
+      ach: pfAch, chars: pfAllChars, boxInfo: pfBoxInfo, global: pfGlobal,
+      // The profile shows only earned achievements (mirroring the characters grid).
+      onlyEarned: true,
+      header: (earned, total) => `
         <div class="pf-games-header">
-          <span class="pf-games-title">Achievements · ${ch.earned + bc.earned + gc.earned} / ${ch.total + bc.total + gc.total}</span>
-        </div>
-        ${pfGlobal ? `
-          <div class="ach-group-label">Global · ${gc.earned} / ${gc.total}</div>
-          ${renderGlobalStripHTML(pfGlobal, true)}` : ''}
-        <div class="ach-group-label">Boxes · ${bc.earned} / ${bc.total}</div>
-        ${renderBoxStripHTML(earnedBoxes)}
-        <div class="ach-group-label">Characters · ${ch.earned} / ${ch.total}</div>
-        ${renderAchievementsGridHTML(pfAch, playedChars)}`;
-    })()}
+          <span class="pf-games-title">Achievements · ${earned} / ${total}</span>
+        </div>`,
+    })}
 
     <div class="pf-games-header">
       <span class="pf-games-title">Games</span>
@@ -383,22 +373,19 @@ function pfRememberReturn(id) {
   try { sessionStorage.setItem('pfReturnGameId', id); } catch (_) {}
 }
 
-let _pfPendingDeleteGameId = null;
-
 function pfDeleteGame(id) {
-  _pfPendingDeleteGameId = id;
-  openOverlay('pfDeleteGameOverlay');
+  openConfirmSheet({
+    id:           'pfDeleteGameOverlay',
+    title:        'Delete Game?',
+    bodyHTML:     `<p class="confirm-text">This will permanently delete the game and all player records. This action cannot be undone.</p>`,
+    confirmLabel: 'Delete Game',
+    busyLabel:    'Deleting…',
+    danger:       true,
+    onConfirm:    () => _pfDeleteGame(id),
+  });
 }
 
-function pfCancelDeleteGame() {
-  _pfPendingDeleteGameId = null;
-  closeOverlay('pfDeleteGameOverlay');
-}
-
-async function pfConfirmDeleteGame() {
-  if (!_pfPendingDeleteGameId) return;
-  const id = _pfPendingDeleteGameId;
-  pfCancelDeleteGame();
+async function _pfDeleteGame(id) {
   const { error } = await db.from('games').delete().eq('id', id);
   if (error) { alert(error.message); return; }
   await load();
@@ -417,38 +404,9 @@ function closeProfileQR() {
   closeOverlay('pfQrOverlay');
 }
 
-// ── ACHIEVEMENT DETAIL ────────────────────────────────────────────────────────
-
-function _showAchDetail(charName) {
-  const body  = document.getElementById('achBody');
-  const title = document.getElementById('achTitle');
-  if (!body || !title) return;
-  title.textContent = pfNick ? `Achievements | ${pfNick}` : 'Achievements';
-  body.innerHTML = renderAchievementDetailHTML(charName, pfAch.get(charName));
-  openOverlay('achOverlay');
-}
-
-function _showBoxDetail(boxName) {
-  const body  = document.getElementById('achBody');
-  const title = document.getElementById('achTitle');
-  if (!body || !title) return;
-  const row = computeBoxCompletion(pfAch, pfAllChars, pfBoxInfo).find(r => r.box === boxName);
-  if (!row) return;
-  title.textContent = pfNick ? `Achievements | ${pfNick}` : 'Achievements';
-  body.innerHTML = renderBoxDetailHTML(row, groupByBox(pfAllChars)[boxName] || [], pfAch);
-  openOverlay('achOverlay');
-}
-
-function _showGlobalDetail(key) {
-  const body  = document.getElementById('achBody');
-  const title = document.getElementById('achTitle');
-  if (!body || !title || !pfGlobal) return;
-  title.textContent = pfNick ? `Achievements | ${pfNick}` : 'Achievements';
-  body.innerHTML = renderGlobalDetailHTML(key, pfGlobal);
-  openOverlay('achOverlay');
-}
-
-function _closeAchOverlay() { closeOverlay('achOverlay'); }
+// The achievement detail overlay handlers (_showAchDetail / _showBoxDetail /
+// _showGlobalDetail / _closeAchOverlay) are shared from achievements.js and read
+// the context set via setAchievementsContext() in render().
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
 init();

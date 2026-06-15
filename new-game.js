@@ -1,11 +1,6 @@
 // ── STATE ─────────────────────────────────────────────────────────────────────
 
 let chars            = [];
-let excluded         = new Set();   // the draw-pool exclusion set — single source of truth
-let ownedBoxes       = new Set();   // boxes owned by the signed-in user
-let selectedPace     = null;        // 'green'|'yellow'|'orange'|'red'|null — single-select pace filter
-let pacePlus         = false;       // when on, a pace selection also includes the adjacent colours
-let mineOn           = false;       // sticky: limit the pool to characters in your boxes
 let orderSlots       = [];          // each: { id, char, isMe, isWinner }
 let orderNextId      = 0;
 let slotTimers       = {};          // slotId → setInterval id (active spin animation)
@@ -19,9 +14,25 @@ let liveTimerId     = null;        // 1s clock ticker
 let _saveIntervalId = null;        // 30s background-persist
 let _resumeTickId   = null;        // resume-banner ticker (set in _checkResume)
 
-const PACE_ORDER = ['green', 'yellow', 'orange', 'red'];
-
 const LEGEND_ITEMS = ['🎲 = draw', '👤 = you', '👑 = winner', '❌ = remove'];
+
+// The draw-pool character filter (excluded set + pace + My-boxes) lives in the
+// shared pace-filter controller; `pace.excluded` is the single source of truth.
+const pace = createPaceFilter({
+  getChars:     () => chars,
+  gridId:       'excludeGrid',
+  paceColorsId: 'paceColors',
+  paceModeId:   'paceMode',
+  mineBtnId:    'ownedOnlyBtn',
+  mineTitles: {
+    signIn:  'Sign in to filter by owned boxes',
+    noBoxes: 'Mark which boxes you own on the account page first',
+    on:      'Pool limited to your boxes',
+    off:     'Limit the pool to your boxes',
+  },
+  onChange: () => { updateExcludeUI(); _updateActionBtns(); },
+  onError:  showErr,
+});
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
@@ -43,8 +54,8 @@ async function init() {
   // Re-render slots whenever auth state changes so the Me-locked indicator
   // updates in-place after sign-in / sign-out.
   await initAuth(async () => {
-    await _loadOwnedBoxes();
-    _updatePaceUI();
+    await pace.loadOwnedBoxes();
+    pace.updatePaceUI();
     // Re-render slots only on a genuine sign-in/out (auth id change), not on the
     // initial auth event or token refreshes — those are redundant here.
     const uid = getCurrentUser()?.id || null;
@@ -56,11 +67,11 @@ async function init() {
   // first event counts as "no change".
   if (_lastAuthId === undefined) _lastAuthId = getCurrentUser()?.id || null;
   chars = await loadCharacters();
-  await _loadOwnedBoxes();
+  await pace.loadOwnedBoxes();
   buildExcludeGrid(
     document.getElementById('excludeGrid'),
     chars,
-    excluded,
+    pace.excluded,
     _onPillToggle
   );
   onBeforeSignIn(_savePendingState);
@@ -71,20 +82,13 @@ async function init() {
     renderOrderSlots();
     _saveLiveState();
   }
-  _updatePaceUI();
+  pace.updatePaceUI();
   updateExcludeUI();   // show the pool size from the start
   _initDrag();
   _checkResume();
   attachLocationAutocomplete('fLocation', 'fLocationDropdown');
   _layoutLegend();
   window.addEventListener('resize', _onLegendResize);
-}
-
-async function _loadOwnedBoxes() {
-  const user = getCurrentUser();
-  if (!user) { ownedBoxes = new Set(); return; }
-  const { data } = await db.from('profile_boxes').select('box').eq('user_id', user.id);
-  ownedBoxes = new Set((data || []).map(r => r.box));
 }
 
 // Pending-state survives the OAuth round-trip (sessionStorage = same tab only)
@@ -104,10 +108,10 @@ function _savePendingState() {
       fLocation:      document.getElementById('fLocation')?.value || '',
       fDur:           document.getElementById('fDur')?.value      || '',
       fTurns:         document.getElementById('fTurns')?.value    || '',
-      excluded:       [...excluded],
-      selectedPace,
-      pacePlus,
-      mineOn,
+      excluded:       [...pace.excluded],
+      selectedPace:   pace.selectedPace,
+      pacePlus:       pace.pacePlus,
+      mineOn:         pace.mineOn,
     }));
   } catch (_) {}
 }
@@ -136,14 +140,12 @@ function _restorePendingState() {
     isWinner: !!s.isWinner,
   }));
 
-  selectedPace = state.selectedPace || null;
-  pacePlus     = !!state.pacePlus;
-  mineOn       = !!state.mineOn;
-  excluded.clear();
-  (state.excluded || []).forEach(n => excluded.add(n));
-  _syncExcludePills();
-  updateExcludeUI();
-  _updatePaceUI();
+  pace.restoreState({
+    excluded:     state.excluded,
+    selectedPace: state.selectedPace,
+    pacePlus:     state.pacePlus,
+    mineOn:       state.mineOn,
+  });
   renderOrderSlots();
   return true;
 }
@@ -173,27 +175,14 @@ function toggleExclude() {
 function updateExcludeUI() {
   const badge = document.getElementById('exBadge');
   if (!badge) return;
-  badge.textContent = chars.length - excluded.size;   // pool size: starts full, shrinks as you exclude
+  badge.textContent = chars.length - pace.excluded.size;   // pool size: starts full, shrinks as you exclude
   badge.classList.add('visible');
 }
 
-function excludeAll() {
-  selectedPace = null;
-  mineOn = false;
-  chars.forEach(c => excluded.add(c.name));
-  _syncExcludePills();
-  updateExcludeUI();
-  _updatePaceUI();
-}
-
-function clearExcluded() {
-  selectedPace = null;
-  mineOn = false;
-  excluded.clear();
-  _syncExcludePills();
-  updateExcludeUI();
-  _updatePaceUI();
-}
+// Bulk pool controls (wired to the filter toolbar) delegate to the shared
+// pace-filter controller.
+function excludeAll()    { pace.excludeAll(); }
+function clearExcluded() { pace.clearExcluded(); }
 
 function applyExclude() {
   const body = document.getElementById('excludeBody');
@@ -207,88 +196,12 @@ function applyExclude() {
 // to that colour's characters (or the colour plus its neighbours when Pace+ is
 // on) — it is not additive. "Mine" is a sticky toggle that further limits the
 // pool to your boxes, and every reset takes it into account. The per-character
-// pills below let you fine-tune on top after a reset.
+// pills below let you fine-tune on top after a reset. All of this lives in the
+// shared pace-filter controller; these are just the toolbar's onclick targets.
 
-// Re-sync every pill's class from the current excluded set.
-function _syncExcludePills() {
-  document.querySelectorAll('#excludeGrid .char-pill').forEach(btn => {
-    btn.classList.toggle('excluded', excluded.has(btn.dataset.name));
-  });
-}
-
-// The paces a colour selection covers: just that colour, or it plus its
-// immediate neighbours when Pace+ is on.
-function _paceBand(color) {
-  if (!pacePlus) return new Set([color]);
-  const i = PACE_ORDER.indexOf(color);
-  return new Set(PACE_ORDER.slice(Math.max(0, i - 1), i + 2));
-}
-
-// Rebuild the exclusion set from the current pace + Mine selection: anything
-// outside the selected pace band — or, when Mine is on, outside your boxes — is
-// excluded; everything else is included.
-function _applyPaceSelection() {
-  const band    = selectedPace ? _paceBand(selectedPace) : null;
-  const useMine = mineOn && !!getCurrentUser() && ownedBoxes.size > 0;
-  excluded.clear();
-  for (const c of chars) {
-    if ((band && !band.has(c.pace)) || (useMine && !ownedBoxes.has(c.box))) {
-      excluded.add(c.name);
-    }
-  }
-  _syncExcludePills();
-  updateExcludeUI();
-  _updateActionBtns();
-}
-
-// Reflect the current selection: the swatches in the selected band, the Pace+
-// toggle, and the Mine button (active + enabled state + tooltip).
-function _updatePaceUI() {
-  const band = selectedPace ? _paceBand(selectedPace) : null;
-  for (const color of PACE_ORDER) {
-    const el = document.querySelector(`#paceColors .pace-color[data-pace="${color}"]`);
-    if (!el) continue;
-    el.classList.remove('sel-primary', 'sel-neighbor', 'sel-out');
-    if (!band) continue;
-    el.classList.add(color === selectedPace ? 'sel-primary' : band.has(color) ? 'sel-neighbor' : 'sel-out');
-  }
-  const modeBtns = document.querySelectorAll('#paceMode .seg-btn');
-  modeBtns[0]?.classList.toggle('on', !pacePlus);
-  modeBtns[1]?.classList.toggle('on',  pacePlus);
-
-  const mineBtn = document.getElementById('ownedOnlyBtn');
-  if (!mineBtn) return;
-  const enabled = !!getCurrentUser() && ownedBoxes.size > 0;
-  mineBtn.classList.toggle('disabled', !enabled);
-  mineBtn.classList.toggle('on', mineOn && enabled);
-  mineBtn.title = !getCurrentUser()
-    ? 'Sign in to filter by owned boxes'
-    : !ownedBoxes.size
-      ? 'Mark which boxes you own on the account page first'
-      : mineOn ? 'Pool limited to your boxes' : 'Limit the pool to your boxes';
-}
-
-// Clicking a colour resets the pool to that colour's band (not additive).
-function selectPace(color) {
-  selectedPace = color;
-  _applyPaceSelection();
-  _updatePaceUI();
-}
-
-// "Pace" vs "Pace+" — whether a colour selection also covers the neighbours.
-function setPaceMode(plus) {
-  pacePlus = plus;
-  if (selectedPace) _applyPaceSelection();   // re-apply with the wider/narrower band
-  _updatePaceUI();
-}
-
-function toggleMine() {
-  if (!getCurrentUser()) { showErr('Sign in to filter by owned boxes.'); return; }
-  if (!ownedBoxes.size)  { showErr('Mark which boxes you own on the account page first.'); return; }
-  mineOn = !mineOn;
-  _applyPaceSelection();
-  _updatePaceUI();
-}
+function selectPace(color) { pace.selectPace(color); }
+function setPaceMode(plus) { pace.setPaceMode(plus); }
+function toggleMine()      { pace.toggleMine(); }
 
 // ── PLAYERS LEGEND LAYOUT ─────────────────────────────────────────────────────
 // Lay the legend out in balanced rows: keep it on one line if it fits, otherwise
@@ -386,7 +299,7 @@ function updateOrderSlot(id, char) {
 // Pool of characters available for slot `excludeId` to draw from.
 function _slotPool(excludeId) {
   const taken = new Set(orderSlots.filter(o => o.id !== excludeId && o.char).map(o => o.char));
-  return chars.filter(c => !excluded.has(c.name) && !taken.has(c.name));
+  return chars.filter(c => !pace.excluded.has(c.name) && !taken.has(c.name));
 }
 
 // Stop an in-flight shuffle animation and settle the DOM to the final order.
@@ -765,13 +678,7 @@ function discardLiveGame() {
   addOrderSlot();
   addOrderSlot();
 
-  excluded.clear();
-  selectedPace = null;
-  pacePlus = false;
-  mineOn = false;
-  _syncExcludePills();
-  updateExcludeUI();
-  _updatePaceUI();
+  pace.reset();
 
   setLiveUI(false);
 }
