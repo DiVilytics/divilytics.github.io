@@ -122,7 +122,7 @@ function render() {
     </div>
     <div class="section-label">Players</div>
     <div class="claim-rows">${rowsHTML}</div>
-    ${myClaim ? `<p class="claim-success">You are playing as <strong>${charImgHTML(myClaim.character)}${_esc(myClaim.character)}</strong> in this game.</p>` : ''}`;
+    ${myClaim ? `<p class="claim-success">You are playing as <strong>${charImgHTML(myClaim.character)} ${_esc(myClaim.character)}</strong> in this game.</p>` : ''}`;
 }
 
 // ── NAV / SHARE ───────────────────────────────────────────────────────────────
