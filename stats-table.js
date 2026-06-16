@@ -19,7 +19,8 @@ function sortStatRows(rows, mode) {
   return sorted.sort((a, b) => {
     const pa = a.games ? a.wins / a.games : 0;
     const pb = b.games ? b.wins / b.games : 0;
-    return pb - pa || b.wins - a.wins;
+    // Tiebreak by wins then games, so e.g. 0% with games ranks above 0 games.
+    return pb - pa || b.wins - a.wins || b.games - a.games;
   });
 }
 

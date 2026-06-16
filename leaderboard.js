@@ -82,8 +82,17 @@ async function loadAndRender() {
       db.rpc('game_stats', lbFilter === 'all' ? {} : { player_count_filter: lbFilter }),
     ]);
 
+    let lbRows = rows || [];
+    // Overall players board: also list registered players who've never played,
+    // as 0/0/0 rows. The sort drops them below anyone who has games.
+    if (lbTab === 'players' && lbFilter === 'all') {
+      const present = new Set(lbRows.map(r => r.nickname));
+      const missing = Object.keys(lbNickAvatarMap).filter(n => !present.has(n));
+      lbRows = lbRows.concat(missing.map(nickname => ({ nickname, wins: 0, games: 0 })));
+    }
+
     _lbCache[key] = {
-      rows:    rows    || [],
+      rows:    lbRows,
       summary: (summary || [])[0] || { games: 0, avg_duration: null, avg_turns: null },
     };
   }

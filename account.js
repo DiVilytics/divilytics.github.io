@@ -25,15 +25,15 @@ async function init() {
     loadCharacters(),
     loadBoxInfo(),
     db.from('profile_boxes').select('box').eq('user_id', user.id),
-    db.from('game_players').select('game_id, character, is_winner').eq('user_id', user.id),
+    _fetchAllRows(() => db.from('game_players').select('game_id, character, is_winner').eq('user_id', user.id)),
   ]);
   _acctChars      = chars;
   _acctBoxInfo    = boxInfo;
   _acctOwnedBoxes = new Set((ownedRes.data || []).map(r => r.box));
-  const myGp      = gpRes.data || [];
+  const myGp      = gpRes.rows;
   _acctAch        = computeCharacterAchievements(myGp);
   const { games, players } = await fetchGamesWithPlayers([...new Set(myGp.map(r => r.game_id))]);
-  _acctGlobal     = computeGlobalAchievements(games, players, p => p.user_id === user.id);
+  _acctGlobal     = computeGlobalAchievements(games, players, p => p.user_id === user.id, _acctChars);
   await _loadIdentities();
   _renderPage();
 }
@@ -114,7 +114,7 @@ function _renderPage() {
         ach: _acctAch, chars: _acctChars, boxInfo: _acctBoxInfo, global: _acctGlobal,
         // The account page shows every achievement, earned or not.
         onlyEarned: false,
-        header: (earned, total) => `<div class="section-label">My Achievements · ${earned} / ${total}</div>`,
+        header: (earned, total) => `<div class="section-label">My Achievements | ${earned} / ${total}</div>`,
       })}
     </div>
 
@@ -216,16 +216,29 @@ async function exportMyData() {
   btn.textContent = 'Preparing…';
 
   try {
-    const [profile, { data: gamePlayers }] = await Promise.all([
+    const [profile, gpAll] = await Promise.all([
       fetchProfile({ id: user.id }),
-      db.from('game_players').select('*').eq('user_id', user.id),
+      _fetchAllRows(() => db.from('game_players').select('*').eq('user_id', user.id)),
     ]);
+
+    // Full record of every game you took part in (date, location, duration,
+    // rounds…), newest first, each with the complete list of players (character,
+    // result, seat) — so the export is self-contained, not just game ids.
+    const gameIds = [...new Set(gpAll.rows.map(r => r.game_id))];
+    const { games, players } = await fetchGamesWithPlayers(gameIds, { orderByPlayedAtDesc: true });
+    const playersByGame = {};
+    for (const p of players) (playersByGame[p.game_id] ||= []).push(p);
+    const gamesOut = games.map(g => ({
+      ...g,
+      players: (playersByGame[g.id] || []).sort((a, b) =>
+        (a.position ?? 999) - (b.position ?? 999) || (a.id < b.id ? -1 : 1)),
+    }));
 
     const payload = {
       exported_at: new Date().toISOString(),
       auth_user:   { id: user.id, email: user.email },
       profile:     profile || null,
-      game_players: gamePlayers || [],
+      games:       gamesOut,
     };
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });

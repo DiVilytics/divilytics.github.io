@@ -169,18 +169,66 @@ function tierMedalHTML(count, tiers, kind) {
   return `<span class="ach-medal ${cls}">${isCup ? '🏆' : '⭐'}</span>`;
 }
 
+// Pace bands a character can have, and the 0-based seat positions, for the
+// "play/win with every pace" and "play/win from every seat" achievements.
+const PACE_KEYS = ['green', 'yellow', 'orange', 'red'];
+const SEAT_KEYS = [0, 1, 2, 3, 4, 5];
+
+// Detail panel for a binary "do X for every member of a set" achievement (table
+// sizes, pace rainbow, starting position): two gold tracks plus a per-member
+// played/won checklist. `members` is [{ label, played, won }].
+function _setCompletionDetailHTML(emojiTitle, members, playedLabel, wonLabel) {
+  const goldRow = (done, label, kind) => {
+    const isCup = kind === 'cup';
+    const tierCls = isCup ? ' ach-cup ach-cup-gold' : ' ach-star ach-star-gold';
+    return `
+      <div class="ach-track-tier${done ? ' earned' : ''}">
+        <span class="ach-track-icon${tierCls}">${isCup ? '🏆' : '⭐'}</span>
+        <span class="ach-track-name">${label}</span>
+        <span class="ach-track-status">${done ? 'Earned' : 'Not yet'}</span>
+      </div>`;
+  };
+  const rows = members.map(m => `
+    <div class="box-detail-char">
+      <span class="box-detail-char-name">${m.label}</span>
+      <span class="box-detail-marks">
+        <span class="${m.played > 0 ? 'on ach-star ach-star-gold' : ''}">${m.played > 0 ? '⭐' : '·'}</span>
+        <span class="${m.won  > 0 ? 'on ach-cup ach-cup-gold' : ''}">${m.won  > 0 ? '🏆' : '·'}</span>
+      </span>
+    </div>`).join('');
+  return `
+    <div class="ach-detail-head"><div class="ach-detail-name">${emojiTitle}</div></div>
+    <div class="ach-track">
+      ${goldRow(members.every(m => m.played > 0), playedLabel, 'medal')}
+      ${goldRow(members.every(m => m.won    > 0), wonLabel,    'cup')}
+    </div>
+    <div class="box-detail-list">${rows}</div>`;
+}
+
 // Compute the viewer's profile-wide stats. `isMine(playerRow)` selects the
-// viewer's rows out of all the players of their games.
-function computeGlobalAchievements(games, players, isMine) {
+// viewer's rows out of all the players of their games. `chars` (the character
+// list, each with a `.pace`) powers the pace-rainbow achievement.
+function computeGlobalAchievements(games, players, isMine, chars = []) {
+  const paceByChar = new Map(chars.map(c => [c.name, c.pace]));
+
   const countByGame = {};
-  for (const p of players) countByGame[p.game_id] = (countByGame[p.game_id] || 0) + 1;
+  const byGame      = {};
+  for (const p of players) {
+    countByGame[p.game_id] = (countByGame[p.game_id] || 0) + 1;
+    (byGame[p.game_id] ||= []).push(p);
+  }
   const locByGame = {};
   for (const g of games) locByGame[g.id] = g.location || null;
 
   const tableSizes = {};
   for (let s = 2; s <= 6; s++) tableSizes[s] = { played: 0, won: 0 };
+  const pace = {};
+  for (const k of PACE_KEYS) pace[k] = { played: 0, won: 0 };
+  const positions = {};
+  for (const i of SEAT_KEYS) positions[i] = { played: 0, won: 0 };
   let games_ = 0, wins_ = 0;
-  const playedLocs = new Set(), wonLocs = new Set();
+  const playedLocs = new Set(),    wonLocs = new Set();
+  const playedPlayers = new Set(), wonPlayers = new Set();   // distinct co-players, keyed by nickname
 
   for (const p of players) {
     if (!isMine(p)) continue;
@@ -194,11 +242,27 @@ function computeGlobalAchievements(games, players, isMine) {
     }
     const loc = locByGame[p.game_id];
     if (loc) { playedLocs.add(loc); if (won) wonLocs.add(loc); }
+
+    const pc = paceByChar.get(p.character);
+    if (pace[pc]) { pace[pc].played++; if (won) pace[pc].won++; }
+
+    if (positions[p.position]) { positions[p.position].played++; if (won) positions[p.position].won++; }
+
+    // The *other* players in this game who have claimed it (have a nickname);
+    // unclaimed seats are anonymous and don't count toward distinct players.
+    for (const q of byGame[p.game_id] || []) {
+      if (isMine(q) || !q.nickname) continue;
+      playedPlayers.add(q.nickname);
+      if (won) wonPlayers.add(q.nickname);
+    }
   }
   return {
     tableSizes,
+    pace,
+    positions,
     volume:    { games: games_, wins: wins_ },
-    locations: { played: playedLocs.size, won: wonLocs.size },
+    locations: { played: playedLocs.size,    won: wonLocs.size },
+    players:   { played: playedPlayers.size, won: wonPlayers.size },
   };
 }
 
@@ -215,6 +279,16 @@ function countGlobalAchievements(g) {
   total += ACH_TIERS.length * 2;
   const lp = _tierIndex(g.locations.played, ACH_TIERS); if (lp >= 0) earned += lp + 1;
   const lw = _tierIndex(g.locations.won,    ACH_TIERS); if (lw >= 0) earned += lw + 1;
+  total += ACH_TIERS.length * 2;
+  const pp = _tierIndex(g.players.played, ACH_TIERS); if (pp >= 0) earned += pp + 1;
+  const pw = _tierIndex(g.players.won,    ACH_TIERS); if (pw >= 0) earned += pw + 1;
+  // Pace rainbow + starting position: a single binary play-all + win-all each.
+  total += 2;
+  if (PACE_KEYS.every(k => g.pace[k].played > 0)) earned++;
+  if (PACE_KEYS.every(k => g.pace[k].won    > 0)) earned++;
+  total += 2;
+  if (SEAT_KEYS.every(i => g.positions[i].played > 0)) earned++;
+  if (SEAT_KEYS.every(i => g.positions[i].won    > 0)) earned++;
   return { earned, total };
 }
 
@@ -240,8 +314,11 @@ function renderGlobalStripHTML(global, onlyEarned = false, onClickFn = '_showGlo
   const wonAll    = sizes.every(s => global.tableSizes[s].won > 0);
   const tiles = [
     tile('volume',    '👤', global.volume.games,     VOLUME_TIERS, global.volume.wins,   VOLUME_TIERS),
-    tile('tables',    '👥', playedAll ? 1 : 0,       DONE_TIER,    wonAll ? 1 : 0,       DONE_TIER),
+    tile('tables',    '🪑', playedAll ? 1 : 0,       DONE_TIER,    wonAll ? 1 : 0,       DONE_TIER),
     tile('locations', '📍', global.locations.played, ACH_TIERS,    global.locations.won, ACH_TIERS),
+    tile('players',   '🤝', global.players.played,   ACH_TIERS,    global.players.won,   ACH_TIERS),
+    tile('pace',      '🌈', PACE_KEYS.every(k => global.pace[k].played > 0) ? 1 : 0, DONE_TIER, PACE_KEYS.every(k => global.pace[k].won > 0) ? 1 : 0, DONE_TIER),
+    tile('positions', '🎲', SEAT_KEYS.every(i => global.positions[i].played > 0) ? 1 : 0, DONE_TIER, SEAT_KEYS.every(i => global.positions[i].won > 0) ? 1 : 0, DONE_TIER),
   ];
   return `<div class="ach-grid">${tiles.join('')}</div>`;
 }
@@ -265,18 +342,6 @@ function renderGlobalDetailHTML(key, global) {
         }).join('')}
       </div>`;
   };
-  // Binary (gold) row, e.g. "played every size".
-  const goldRow = (done, label, kind) => {
-    const isCup = kind === 'cup';
-    const tierCls = isCup ? ' ach-cup ach-cup-gold' : ' ach-star ach-star-gold';
-    return `
-      <div class="ach-track-tier${done ? ' earned' : ''}">
-        <span class="ach-track-icon${tierCls}">${isCup ? '🏆' : '⭐'}</span>
-        <span class="ach-track-name">${label}</span>
-        <span class="ach-track-status">${done ? 'Earned' : 'Not yet'}</span>
-      </div>`;
-  };
-
   if (key === 'volume') {
     return `
       <div class="ach-detail-head"><div class="ach-detail-name">👤 Volume</div></div>
@@ -289,28 +354,29 @@ function renderGlobalDetailHTML(key, global) {
       ${tierTrack(global.locations.played, ACH_TIERS, 'Distinct locations played', 'medal')}
       ${tierTrack(global.locations.won,    ACH_TIERS, 'Distinct locations won',    'cup')}`;
   }
-  if (key === 'tables') {
-    const sizes     = [2, 3, 4, 5, 6];
-    const playedAll = sizes.every(s => global.tableSizes[s].played > 0);
-    const wonAll    = sizes.every(s => global.tableSizes[s].won > 0);
-    const sizeRows = sizes.map(s => {
-      const ts = global.tableSizes[s];
-      return `
-        <div class="box-detail-char">
-          <span class="box-detail-char-name">${s} players</span>
-          <span class="box-detail-marks">
-            <span class="${ts.played > 0 ? 'on ach-star ach-star-gold' : ''}">${ts.played > 0 ? '⭐' : '·'}</span>
-            <span class="${ts.won  > 0 ? 'on ach-cup ach-cup-gold' : ''}">${ts.won  > 0 ? '🏆' : '·'}</span>
-          </span>
-        </div>`;
-    }).join('');
+  if (key === 'players') {
     return `
-      <div class="ach-detail-head"><div class="ach-detail-name">👥 Table sizes</div></div>
-      <div class="ach-track">
-        ${goldRow(playedAll, 'Played every size (2–6p)', 'medal')}
-        ${goldRow(wonAll,    'Won every size (2–6p)',    'cup')}
-      </div>
-      <div class="box-detail-list">${sizeRows}</div>`;
+      <div class="ach-detail-head"><div class="ach-detail-name">🤝 Players</div></div>
+      ${tierTrack(global.players.played, ACH_TIERS, 'Distinct players played with', 'medal')}
+      ${tierTrack(global.players.won,    ACH_TIERS, 'Distinct players beaten',      'cup')}
+      <p class="modal-hint">Only players who've claimed their character in a game count.</p>`;
+  }
+  if (key === 'tables') {
+    return _setCompletionDetailHTML('🪑 Table sizes',
+      [2, 3, 4, 5, 6].map(s => ({ label: `${s} players`, played: global.tableSizes[s].played, won: global.tableSizes[s].won })),
+      'Played every size (2–6p)', 'Won every size (2–6p)');
+  }
+  if (key === 'pace') {
+    const names = { green: '🟢 Green', yellow: '🟡 Yellow', orange: '🟠 Orange', red: '🔴 Red' };
+    return _setCompletionDetailHTML('🌈 Pace rainbow',
+      PACE_KEYS.map(k => ({ label: names[k], played: global.pace[k].played, won: global.pace[k].won })),
+      'Played a character of every pace', 'Won with a character of every pace');
+  }
+  if (key === 'positions') {
+    const ord = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
+    return _setCompletionDetailHTML('🎲 Starting position',
+      SEAT_KEYS.map(i => ({ label: `${ord[i]} seat`, played: global.positions[i].played, won: global.positions[i].won })),
+      'Played from every seat (1st–6th)', 'Won from every seat (1st–6th)');
   }
   return '';
 }
@@ -422,11 +488,11 @@ function achievementsSectionHTML({ ach, chars, boxInfo, global, onlyEarned = fal
   return `
     ${header(totalEarned, totalAll)}
     ${global ? `
-      <div class="ach-group-label">Global · ${gc.earned} / ${gc.total}</div>
+      <div class="ach-group-label">Global | ${gc.earned} / ${gc.total}</div>
       ${renderGlobalStripHTML(global, onlyEarned)}` : ''}
-    <div class="ach-group-label">Boxes · ${bc.earned} / ${bc.total}</div>
+    <div class="ach-group-label">Boxes | ${bc.earned} / ${bc.total}</div>
     ${renderBoxStripHTML(boxesToShow)}
-    <div class="ach-group-label">Characters · ${ch.earned} / ${ch.total}</div>
+    <div class="ach-group-label">Characters | ${ch.earned} / ${ch.total}</div>
     ${renderAchievementsGridHTML(ach, charsToShow)}`;
 }
 

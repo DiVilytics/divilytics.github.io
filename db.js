@@ -14,6 +14,39 @@ function _esc(s) {
     .replace(/"/g, '&quot;');
 }
 
+// ── PAGINATION HELPERS ────────────────────────────────────────────────────────
+// PostgREST caps a single response (commonly ~1000 rows). These let the client
+// assemble complete result sets past that cap — no server-side RPC needed.
+
+// Run an `.in(col, ids)` query in chunks of ids, keeping each response under the
+// row cap (and the URL short), then concatenate. `build(idChunk)` returns the
+// query for one chunk. Chunks run in parallel and order is NOT preserved across
+// them, so sort in JS afterwards if you need a global order.
+async function _fetchInChunks(ids, build, chunkSize = 150) {
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += chunkSize) chunks.push(ids.slice(i, i + chunkSize));
+  const pages = await Promise.all(chunks.map(async chunk => {
+    const { data, error } = await build(chunk);
+    if (error) { console.warn('_fetchInChunks error:', error); return []; }
+    return data || [];
+  }));
+  return pages.flat();
+}
+
+// Page through a single query past the row cap with `.range()`. `build()` must
+// return a FRESH query builder each call. Returns { rows, error } — error is the
+// first page error, with whatever rows were gathered before it.
+async function _fetchAllRows(build, pageSize = 1000) {
+  const rows = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await build().range(from, from + pageSize - 1);
+    if (error) { console.warn('_fetchAllRows error:', error); return { rows, error }; }
+    rows.push(...(data || []));
+    if (!data || data.length < pageSize) break;
+  }
+  return { rows, error: null };
+}
+
 // ── PROFILE FETCH ─────────────────────────────────────────────────────────────
 
 // Fetch a single profile row. `match` is one filter pair, e.g. { id: '...' }
@@ -44,23 +77,19 @@ async function fetchAllProfiles(fields = 'nickname, avatar_url, default_avatar')
 // want their participants (game-log, characters monthly report, etc).
 async function fetchPlayersForGames(ids) {
   if (!ids.length) return [];
-  const { data, error } = await db
-    .from('game_players')
-    .select('*')
-    .in('game_id', ids)
-    .order('position');
-  if (error) console.warn('fetchPlayersForGames error:', error);
-  return data || [];
+  // Chunked so a player/character with many games never hits the row cap.
+  // Callers group + sort by game, so cross-chunk order doesn't matter.
+  return _fetchInChunks(ids, chunk =>
+    db.from('game_players').select('*').in('game_id', chunk).order('position'));
 }
 
 // Fetch full game rows by id. `orderByPlayedAtDesc` returns newest first.
 async function fetchGamesByIds(ids, { orderByPlayedAtDesc = false } = {}) {
   if (!ids.length) return [];
-  let q = db.from('games').select('*').in('id', ids);
-  if (orderByPlayedAtDesc) q = q.order('played_at', { ascending: false });
-  const { data, error } = await q;
-  if (error) console.warn('fetchGamesByIds error:', error);
-  return data || [];
+  const games = await _fetchInChunks(ids, chunk => db.from('games').select('*').in('id', chunk));
+  // Order is lost across chunks, so sort in JS when the caller wants newest-first.
+  if (orderByPlayedAtDesc) games.sort((a, b) => new Date(b.played_at) - new Date(a.played_at));
+  return games;
 }
 
 // Convenience: returns { games, players } for a set of ids in one trip.

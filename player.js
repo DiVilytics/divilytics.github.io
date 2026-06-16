@@ -87,10 +87,8 @@ async function init() {
 
 async function load() {
   // 1) find all game_players rows matching this nickname
-  const { data: myRows, error } = await db
-    .from('game_players')
-    .select('game_id')
-    .eq('nickname', pfNick);
+  const { rows: myRows, error } = await _fetchAllRows(() =>
+    db.from('game_players').select('game_id').eq('nickname', pfNick));
 
   if (error) {
     document.getElementById('pfRoot').className = '';
@@ -99,7 +97,7 @@ async function load() {
     return;
   }
 
-  let gameIds = (myRows || []).map(r => r.game_id);
+  let gameIds = myRows.map(r => r.game_id);
 
   // On your own profile, also include games you created — even ones you haven't
   // claimed a character in (e.g. after releasing your claim). Otherwise such a
@@ -107,11 +105,9 @@ async function load() {
   const me      = getCurrentUser();
   const profile = getCurrentProfile();
   if (me && profile && profile.nickname === pfNick) {
-    const { data: createdRows } = await db
-      .from('games')
-      .select('id')
-      .eq('created_by', me.id);
-    gameIds = gameIds.concat((createdRows || []).map(r => r.id));
+    const { rows: createdRows } = await _fetchAllRows(() =>
+      db.from('games').select('id').eq('created_by', me.id));
+    gameIds = gameIds.concat(createdRows.map(r => r.id));
   }
 
   gameIds = [...new Set(gameIds)];
@@ -120,7 +116,7 @@ async function load() {
   pfGames   = games;
   pfPlayers = players;
   pfAch     = computeCharacterAchievements(players.filter(p => p.nickname === pfNick));
-  pfGlobal  = computeGlobalAchievements(games, players, p => p.nickname === pfNick);
+  pfGlobal  = computeGlobalAchievements(games, players, p => p.nickname === pfNick, pfAllChars);
 
   document.getElementById('pfRoot').className = '';
 
@@ -229,6 +225,15 @@ function render() {
   const nGames = mine.length;
   const winPct = nGames ? Math.round((wins / nGames) * 100) : 0;
 
+  // Longest run of consecutive wins, chronological, within the current filter.
+  const atById = {};
+  for (const g of pfGames) atById[g.id] = g.played_at;
+  let bestStreak = 0, streakRun = 0;
+  for (const p of [...mine].sort((a, b) => new Date(atById[a.game_id]) - new Date(atById[b.game_id]))) {
+    if (p.is_winner) { streakRun++; if (streakRun > bestStreak) bestStreak = streakRun; }
+    else streakRun = 0;
+  }
+
   const avgDur   = avg(games.map(g => g.duration_minutes));
   const avgTurns = avg(games.map(g => g.num_turns));
 
@@ -260,6 +265,7 @@ function render() {
         { val: avgTurns != null ? Math.round(avgTurns)     : '-', lbl: 'Avg rounds' },
         { val: winPct + '%', lbl: 'Win rate' },
         { val: wins,         lbl: 'Wins' },
+        { val: bestStreak,   lbl: 'Max streak' },
       ])}
     </div>
 
@@ -288,7 +294,7 @@ function render() {
       onlyEarned: true,
       header: (earned, total) => `
         <div class="pf-games-header">
-          <span class="pf-games-title">Achievements · ${earned} / ${total}</span>
+          <span class="pf-games-title">Achievements | ${earned} / ${total}</span>
         </div>`,
     })}
 
