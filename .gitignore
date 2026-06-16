@@ -35,3 +35,6 @@ coverage/
 
 # Local overrides
 *.local
+
+# Private files
+CODEBASE_MAP.md

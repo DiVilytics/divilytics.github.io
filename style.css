@@ -2208,6 +2208,15 @@ select:disabled {
 
 .home-share-btn { flex-shrink: 0; }
 
+.home-steps-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 8px 2px;
+}
+
 .home-steps {
   display: grid;
   grid-template-columns: 1fr 1fr;
