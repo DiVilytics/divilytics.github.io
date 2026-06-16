@@ -41,7 +41,10 @@
 
 <main>
   <div class="home-hero">
-    <h1 class="home-title">DiVilytics | Disney Villainous Analytics</h1>
+    <div class="home-title-row">
+      <h1 class="home-title">DiVilytics | Disney Villainous Analytics</h1>
+      <button class="btn btn-ghost btn-sm home-share-btn" onclick="shareApp()" title="Share DiVilytics">Share</button>
+    </div>
     <p class="home-tagline">Archive, track, and analyze your Disney Villainous sessions.<br>Contribute to a shared community database and consult global stats.</p>
   </div>
 
@@ -164,6 +167,31 @@
   </div>
 </main>
 
+<!-- Share-app QR sheet -->
+<div class="overlay" id="shareAppOverlay" onclick="if(event.target===this) closeOverlay('shareAppOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <h3>Share DiVilytics</h3>
+      <button class="sheet-close" onclick="closeOverlay('shareAppOverlay')">×</button>
+    </div>
+    <div class="sheet-body">
+      <p class="modal-hint">Scan this to open DiVilytics, or copy the link to share it anywhere.</p>
+      <div class="qr-wrap">
+        <div id="shareAppQrCode"></div>
+      </div>
+      <div class="qr-url-row">
+        <div class="qr-url" id="qrUrlText"></div>
+        <button class="pf-btn" onclick="copyQrUrl()" title="Copy link">⎘</button>
+      </div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn btn-primary" onclick="closeOverlay('shareAppOverlay')">Done</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="db.js"></script>

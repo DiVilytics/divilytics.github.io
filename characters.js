@@ -10,30 +10,25 @@ let csReportMonth = (() => {
 // Aggregates character stats from the games played in `monthStart`'s calendar
 // month. Returns { stats, label, gameCount } where stats matches the shape
 // used by the character_stats view ({ character, wins, games }).
+//
+// The per-character aggregation runs server-side (monthly_character_stats RPC)
+// rather than pulling every game_players row for the month into the browser —
+// consistent with the other stats surfaces, and immune to the ~1000-row cap.
 async function _loadMonthCharacterStats(monthStart) {
   const start = new Date(monthStart.getFullYear(), monthStart.getMonth(),     1);
   const end   = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
   const label = start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const iso   = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-01`;
 
-  const { data: games } = await db
-    .from('games')
-    .select('id')
-    .gte('played_at', start.toISOString())
-    .lt('played_at',  end.toISOString());
+  const [{ data: stats }, { count }] = await Promise.all([
+    db.rpc('monthly_character_stats', { month_start: iso }),
+    db.from('games')
+      .select('id', { count: 'exact', head: true })
+      .gte('played_at', start.toISOString())
+      .lt('played_at',  end.toISOString()),
+  ]);
 
-  const ids = (games || []).map(g => g.id);
-  if (!ids.length) return { stats: [], label, gameCount: 0 };
-
-  const players = await fetchPlayersForGames(ids);
-
-  const agg = new Map();
-  for (const p of players) {
-    const cur = agg.get(p.character) || { character: p.character, wins: 0, games: 0 };
-    cur.games += 1;
-    if (p.is_winner) cur.wins += 1;
-    agg.set(p.character, cur);
-  }
-  return { stats: [...agg.values()], label, gameCount: ids.length };
+  return { stats: stats || [], label, gameCount: count || 0 };
 }
 
 function _isFutureMonth(d) {
@@ -323,12 +318,14 @@ async function renderDetailPage(charName) {
 
   // Avg duration / rounds across every game this character was played in (one row
   // per game — a character appears at most once per game).
-  const { data: dgames } = await db
+  // Paged past the ~1000-row response cap so a heavily-played character's averages
+  // aren't computed from a truncated sample.
+  const { rows: dgames } = await _fetchAllRows(() => db
     .from('game_players')
     .select('games(duration_minutes, num_turns)')
-    .eq('character', charName);
-  csAvgDur   = avg((dgames || []).map(r => r.games?.duration_minutes));
-  csAvgTurns = avg((dgames || []).map(r => r.games?.num_turns));
+    .eq('character', charName));
+  csAvgDur   = avg(dgames.map(r => r.games?.duration_minutes));
+  csAvgTurns = avg(dgames.map(r => r.games?.num_turns));
 
   render();
   await renderFaq(charName);

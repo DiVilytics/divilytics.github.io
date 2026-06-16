@@ -73,16 +73,19 @@ async function loadAndRender() {
       ? (isChar ? 'character_stats' : 'player_stats')
       : (isChar ? 'character_stats_by_size' : 'player_stats_by_size');
 
-    const rowsQuery = lbFilter === 'all'
+    // Paged past the ~1000-row response cap so a large player_stats board (or any
+    // size-filtered view) isn't silently truncated. _fetchAllRows needs a fresh
+    // builder each page.
+    const buildRows = () => lbFilter === 'all'
       ? db.from(view).select('*')
       : db.from(view).select('*').eq('player_count', lbFilter);
 
-    const [{ data: rows }, { data: summary }] = await Promise.all([
-      rowsQuery,
+    const [{ rows }, { data: summary }] = await Promise.all([
+      _fetchAllRows(buildRows),
       db.rpc('game_stats', lbFilter === 'all' ? {} : { player_count_filter: lbFilter }),
     ]);
 
-    let lbRows = rows || [];
+    let lbRows = rows;
     // Overall players board: also list registered players who've never played,
     // as 0/0/0 rows. The sort drops them below anyone who has games.
     if (lbTab === 'players' && lbFilter === 'all') {

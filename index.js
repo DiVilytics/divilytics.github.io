@@ -14,6 +14,12 @@ function _updateHomeThemeBtns() {
   document.getElementById('homeThemeIcon').textContent = { dark: '🌙', light: '☀️', auto: '🌗' }[current];
 }
 
+// Show a QR (and copyable link) pointing at the app's home page, so someone at
+// the table can scan to open DiVilytics, or you can copy the link to share remotely.
+function shareApp() {
+  showQRModal(location.origin + '/', 'shareAppQrCode', 'shareAppOverlay');
+}
+
 function _updateHomeAuthBtns() {
   const loggedIn = !!getCurrentUser();
   document.querySelector('#homeAuthRow .btn:nth-child(1)').disabled = loggedIn;

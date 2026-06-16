@@ -280,6 +280,9 @@ a.chip {
 }
 .pf-share-btn { flex: none; }
 
+/* Character detail page: a larger identity portrait than the 40px default. */
+#csIdentity .identity-portrait { width: 120px; height: 120px; }
+
 .pf-name-block { display: flex; flex-direction: column; gap: 1px; }
 .pf-nick { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
 .pf-since { font-size: 12px; font-weight: 400; color: var(--dim); letter-spacing: 0; }
@@ -2188,12 +2191,22 @@ select:disabled {
   color: var(--text);
 }
 
+.home-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.home-title-row .home-title { flex: 1; }
+
 .home-tagline {
   margin-top: 8px;
   font-size: 13px;
   color: var(--muted);
   line-height: 1.5;
 }
+
+.home-share-btn { flex-shrink: 0; }
 
 .home-steps {
   display: grid;

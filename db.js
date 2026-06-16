@@ -64,10 +64,11 @@ async function fetchProfile(match, fields = '*') {
 }
 
 // Fetch all profiles. Used by leaderboard for nickname → avatar mapping.
+// Paged so the result is complete past the ~1000-row PostgREST response cap.
 async function fetchAllProfiles(fields = 'nickname, avatar_url, default_avatar') {
-  const { data, error } = await db.from('profiles').select(fields);
+  const { rows, error } = await _fetchAllRows(() => db.from('profiles').select(fields));
   if (error) console.warn('fetchAllProfiles error:', error);
-  return data || [];
+  return rows;
 }
 
 // ── GAMES + PLAYERS HYDRATION ────────────────────────────────────────────────
