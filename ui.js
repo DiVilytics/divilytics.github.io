@@ -8,7 +8,7 @@ function charImgSrc(name) {
 }
 
 function charImgHTML(name) {
-  return `<img class="char-portrait" src="${charImgSrc(name)}" alt="">`;
+  return `<img class="char-portrait" src="${charImgSrc(name)}" onerror="this.src='asset/players/default.svg'" alt="">`;
 }
 
 // Avatar helpers (resolveAvatar, the builder recipe model, avatarHTML,
@@ -27,7 +27,7 @@ function groupByBox(chars) {
 
 function charSelectHTML(chars, selected = '') {
   const byBox = groupByBox(chars);
-  let html = '<option value="">— Character —</option>';
+  let html = '<option value="">Character</option>';
   for (const [box, cs] of Object.entries(byBox)) {
     html += `<optgroup label="${box}">`;
     for (const c of cs) {
@@ -48,7 +48,7 @@ function buildCharPillGrid(container, chars, set, { activeClass = 'on', onToggle
 
   // The pill's own class is the source of truth for "is this active": some
   // callers (new-game) reassign their backing set on every recompute, so a
-  // captured set reference can go stale — the DOM class never does. We still
+  // captured set reference can go stale, the DOM class never does. We still
   // mutate `set` and fire `onToggle` so the caller's real state stays in sync.
   const isActive = btn => btn.classList.contains(activeClass);
   const setChar = (name, btn, active) => {
@@ -85,10 +85,6 @@ function buildCharPillGrid(container, chars, set, { activeClass = 'on', onToggle
       boxBtns.forEach(({ name, btn }) => setChar(name, btn, !allOn));
     };
   }
-}
-
-function buildCharGrid(container, chars, selectedSet, onToggle) {
-  buildCharPillGrid(container, chars, selectedSet, { activeClass: 'on', onToggle });
 }
 
 function buildExcludeGrid(container, chars, excludedSet, onChange) {
@@ -246,6 +242,12 @@ function updateFilterPills(selector, value) {
   document.querySelectorAll(selector).forEach((btn, i) => {
     btn.classList.toggle('on', (i === 0 ? 'all' : i + 1) === value);
   });
+}
+
+// The active location-filter pill ("<loc> | Clear"), shared by the game log and
+// the player profile. `onClear` is the global handler name the button calls.
+function locationFilterPillHTML(loc, onClear) {
+  return `<button class="pill on" type="button" onclick="${onClear}()">${_esc(loc)} | Clear</button>`;
 }
 
 // The stat table (renderStatTableHTML + statBoxesHTML + sort/rank/bar helpers)

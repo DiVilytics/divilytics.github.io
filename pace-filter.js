@@ -10,9 +10,9 @@
 // createPaceFilter() owns that state and all the DOM sync (pills, pace swatches,
 // the Pace/Pace+ toggle and the My-boxes button). The host page supplies the
 // element ids and two callbacks:
-//   onChange() — run after the excluded set changes (refresh the page's own
+//   onChange(), run after the excluded set changes (refresh the page's own
 //                badge / action buttons / etc.); pace UI is handled here.
-//   onError(msg) — surface a guard message (e.g. not signed in).
+//   onError(msg), surface a guard message (e.g. not signed in).
 //
 // Depends on getCurrentUser() (shared.js) and db (db.js).
 
@@ -106,7 +106,7 @@ function createPaceFilter({
     applyPaceSelection();
   }
 
-  // "Pace" vs "Pace+" — whether a colour selection also covers the neighbors.
+  // "Pace" vs "Pace+", whether a colour selection also covers the neighbors.
   function setPaceMode(plus) {
     pacePlus = plus;
     if (selectedPace) applyPaceSelection();  // re-apply with the wider/narrower band

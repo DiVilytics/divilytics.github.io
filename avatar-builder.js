@@ -1,16 +1,16 @@
 // ── AVATAR BUILDER ─────────────────────────────────────────────────────────────
 // The account page's "compose your own icon" UI: pick one transparent PNG part
 // per body slot over a background colour. The parts, draw order and per-part
-// option counts live in AVATAR_BUILDER (avatar.js) — the same config the renderer
+// option counts live in AVATAR_BUILDER (avatar.js), the same config the renderer
 // uses, so the builder and every display point can never drift. Saving stores a
 // compact recipe string in avatar_url; avatarHTML() composes it on the fly. The
 // live preview uses that same render path (no rasterization anywhere).
 //
 // The host (account.js) wires it up with configure({ getSavedAvatar, onPreview }):
-//   getSavedAvatar() — the avatar currently saved on the profile (to seed from)
-//   onPreview()      — called after any edit so the host can re-render the preview
+//   getSavedAvatar(), the avatar currently saved on the profile (to seed from)
+//   onPreview()     , called after any edit so the host can re-render the preview
 const avatarBuilder = (() => {
-  // Disney Villainous jewel tones — villain signature colours over a dark, moody
+  // Disney Villainous jewel tones, villain signature colours over a dark, moody
   // base (Maleficent purple/green, Ursula teal, Jafar/Hook crimson, Prince John
   // gold, Hades blue, the black-and-gold box).
   const BG_SWATCHES = ['#4a1d6e', '#6b2d8c', '#7d1f3f', '#a01515', '#b8621b', '#c9a227', '#1f7a4d', '#0e5c6b', '#15182e'];
@@ -102,7 +102,7 @@ const avatarBuilder = (() => {
   }
 
   // Roll a random part for every slot and a random villain background, then sync
-  // the steppers, swatches and preview (without persisting a new avatar — the
+  // the steppers, swatches and preview (without persisting a new avatar, the
   // user still confirms with "Use this icon").
   function randomize() {
     for (const part of AVATAR_BUILDER.parts) {

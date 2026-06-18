@@ -1,6 +1,6 @@
 /* ──────────────────────────────────────────────────────────────────────────
    TABLE OF CONTENTS
-   1.  TOKENS         design tokens (colors, radii) — light-theme overrides
+   1.  TOKENS         design tokens (colors, radii), light-theme overrides
    2.  RESET          baseline element resets
    3.  UTILITIES      .hidden, .text-right, .mb-1, .modal-hint, etc.
    4.  NAV            top bar, links, badges, theme toggle
@@ -24,7 +24,7 @@
    22. HOME PAGE      index.html hero / steps / FAQ
    23. ACCOUNT PAGE   account.html identity + danger zone
    24. HOVER STATES   pointer-only hover styles, grouped by component
-   25. RESPONSIVE     media queries — kept LAST so cascade lands correctly
+   25. RESPONSIVE     media queries, kept LAST so cascade lands correctly
    ────────────────────────────────────────────────────────────────────────── */
 
 /* ── 1. TOKENS ────────────────────────────────────────────────────── */
@@ -48,7 +48,7 @@
   --r: 10px;
   --rs: 6px;
 
-  /* Pace band colours — shared by the pace dots (character pages) and the
+  /* Pace band colours, shared by the pace dots (character pages) and the
      new-game / game-log pace swatches. */
   --pace-green:  #4ade80;
   --pace-yellow: #facc15;
@@ -279,9 +279,6 @@ a.chip {
   gap: 12px;
 }
 .pf-share-btn { flex: none; }
-
-/* Character detail page: a larger identity portrait than the 40px default. */
-#csIdentity .identity-portrait { width: 120px; height: 120px; }
 
 .pf-name-block { display: flex; flex-direction: column; gap: 1px; }
 .pf-nick { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
@@ -607,7 +604,48 @@ main {
   color: var(--muted);
 }
 
-/* Shared dark panel surface — game cards and the leaderboard / stats table. */
+/* "Played with": ranked list of the co-players sharing the most games. */
+.pf-friends {
+  background: var(--s1);
+  border-radius: var(--r);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.pf-friend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  text-decoration: none;
+  color: var(--text);
+  border-top: 1px solid var(--border);
+}
+.pf-friend:first-child { border-top: none; }
+.pf-friend .player-avatar { margin-right: 0; }
+.pf-friend-rank  { width: 16px; flex-shrink: 0; text-align: right; font-size: 13px; font-weight: 700; color: var(--muted); }
+.pf-friend-nick  { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-friend-count { flex-shrink: 0; font-size: 13px; color: var(--dim); }
+
+/* Character detail: "Rivalries", most-beaten / most-lost-to opponents. */
+.cs-adv { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.cs-adv-col { background: var(--s1); border-radius: var(--r); overflow: hidden; }
+.cs-adv-title {
+  padding: 10px 14px 8px;
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.cs-adv-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px; text-decoration: none; color: var(--text);
+  border-top: 1px solid var(--border);
+}
+.cs-adv-row .char-portrait { width: 24px; height: 24px; flex-shrink: 0; }
+.cs-adv-name  { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-adv-count { flex-shrink: 0; font-size: 12px; color: var(--dim); }
+.cs-adv-empty { padding: 4px 14px 12px; color: var(--dim); font-size: 13px; }
+.cs-adv-seg .seg-btn { padding: 4px 11px; }
+
+/* Shared dark panel surface, game cards and the leaderboard / stats table. */
 .game-card,
 .lb-table {
   background: var(--s1);
@@ -675,7 +713,7 @@ main {
 
 .chip-nick { font-size: 11px; color: var(--muted); }
 
-/* Winner highlight — game-card chips and claim-page rows. */
+/* Winner highlight, game-card chips and claim-page rows. */
 .chip.winner,
 .claim-row.winner {
   background: var(--gold-d);
@@ -1082,7 +1120,7 @@ select:disabled {
 
 /* Leaderboard only: character rows carry a 2-line identity (name + box sub) while
    player rows are 1 line, so they differ in height. Even both tabs out to a
-   middle height — a min-height plus slightly tighter padding so the taller
+   middle height, a min-height plus slightly tighter padding so the taller
    (character) rows shrink and the shorter (player) rows grow to meet it. */
 #lb .lb-row, #pfRoot .lb-row { min-height: 47px; padding-top: 7px; padding-bottom: 7px; }
 /* The character identity is two lines (name + box) and inherits body line-height
@@ -1509,11 +1547,11 @@ select:disabled {
 }
 /* Locked = empty slot: a dim middot, uniform with the box medals. */
 .ach-medal.locked { color: var(--dim); filter: none; }
-/* Cup tier tints — recolor the 🏆 emoji per tier via filters.
+/* Cup tier tints, recolor the 🏆 emoji per tier via filters.
    The trick: grayscale flattens the emoji, then sepia + hue-rotate
    tints it toward bronze/silver/gold. Silver keeps a slight cool tint so
    it doesn't blend into the neutral-grey locked state. */
-/* Star tier tints — same recipe as the cups so plays/wins share an aura. */
+/* Star tier tints, same recipe as the cups so plays/wins share an aura. */
 .ach-cup.ach-cup-bronze,
 .ach-star.ach-star-bronze {
     filter: grayscale(1) sepia(1) saturate(1.8) hue-rotate(-35deg) brightness(0.75) contrast(1.1);
@@ -1626,14 +1664,14 @@ select:disabled {
 .pace-color.orange { background: var(--pace-orange); }
 .pace-color.red    { background: var(--pace-red); }
 .pace-color:hover  { transform: scale(1.08); }
-/* Selection states. "primary" is the clicked colour — full colour + the black
+/* Selection states. "primary" is the clicked colour, full colour + the black
    ring (2px border + 1px box-shadow, which Firefox renders evenly, unlike a 3px
    border). Pace+ neighbours render at full colour with no ring (no rule needed).
    Colours outside the selection stay coloured but fade back. */
 .pace-color.sel-primary { border-color: var(--text); box-shadow: 0 0 0 1px var(--text); }
 .pace-color.sel-out     { opacity: 0.2; }
 
-/* Inline variant — sits in the same row as the mode select */
+/* Inline variant, sits in the same row as the mode select */
 .exclude-toggle.exclude-toggle-inline {
   width: auto;
   padding: 5px 10px;
@@ -1652,8 +1690,8 @@ select:disabled {
   border-radius: var(--rs);
   margin-top: 0;
 }
-/* Tuck the toggle row close to whatever follows it — the open pool panel, or
-   the Players section when the panel is closed — instead of leaving the row's
+/* Tuck the toggle row close to whatever follows it, the open pool panel, or
+   the Players section when the panel is closed, instead of leaving the row's
    full bottom margin (which felt like too big a gap when closed). */
 .draw-mode-row:has(+ .exclude-body) { margin-bottom: 6px; }
 
@@ -1716,7 +1754,7 @@ select:disabled {
   gap: 6px;
   overflow: hidden;
 }
-/* Hidden picker — overlays the info area; tap to open the dropdown */
+/* Hidden picker, overlays the info area; tap to open the dropdown */
 .order-slot-select {
   position: absolute;
   inset: 0;
@@ -2545,6 +2583,10 @@ select:disabled {
   .row-name-link:hover                      { text-decoration: underline; }
   .row-sub-link:hover                       { text-decoration: underline; color: var(--muted); }
   .pf-since-link:hover                      { text-decoration: underline; text-underline-offset: 2px; color: var(--muted); }
+  .pf-friend:hover                          { background: var(--s2); }
+  .pf-friend:hover .pf-friend-nick          { text-decoration: underline; }
+  .cs-adv-row:hover                         { background: var(--s2); }
+  .cs-adv-row:hover .cs-adv-name            { text-decoration: underline; }
   .home-ack-card a:hover                    { text-decoration: underline; }
   .acct-nick-link:hover                     { text-decoration: underline; text-underline-offset: 2px; }
   .lb-row:hover                             { background: var(--s2); }

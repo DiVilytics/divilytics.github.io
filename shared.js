@@ -41,7 +41,7 @@ const liveGame = (() => {
     on(name, fn) { _hooks[name]?.push(fn); },
     emit(name)   { _hooks[name]?.forEach(fn => fn()); },
 
-    // persistence — `extras` carries the form/slot data that only new-game.js knows
+    // persistence, `extras` carries the form/slot data that only new-game.js knows
     persist(extras = {}) {
       if (!_hasSession) return;
       try {
@@ -114,12 +114,12 @@ window.addEventListener('storage', e => {
 
 let _currentUser    = null;
 let _currentProfile = null;
-let _profileLoadFailed = false;  // true when the last fetch errored (likely offline) — don't prompt for nickname
+let _profileLoadFailed = false;  // true when the last fetch errored (likely offline), don't prompt for nickname
 let _authChangeHook = null;
 let _authResolved   = false;     // true once the session check has actually run
 
 // Cache the signed-in nav avatar so the first paint (before the async session
-// check) shows it instead of the guest button — avoids a guest→avatar flash on
+// check) shows it instead of the guest button, avoids a guest→avatar flash on
 // every page load for returning users.
 const NAV_AUTH_LS = 'divilytics:navAvatar';
 function _cachedNavAvatar() {
@@ -143,7 +143,7 @@ async function initAuth(onChange) {
     _currentUser = session.user;
     await _loadProfile();
   } else {
-    _setCachedNavAvatar(null);   // not logged in — drop any stale cached avatar
+    _setCachedNavAvatar(null);   // not logged in, drop any stale cached avatar
   }
 
   db.auth.onAuthStateChange(async (event, session) => {
@@ -169,7 +169,7 @@ async function initAuth(onChange) {
 
   // Force nickname setup if logged in but no profile yet
   // (e.g. user closed the tab before finishing setup and came back).
-  // Skip when the profile fetch errored — likely offline with a cached page,
+  // Skip when the profile fetch errored, likely offline with a cached page,
   // and we can't tell whether a profile actually exists.
   if (_currentUser && !_currentProfile && !_profileLoadFailed) {
     _openNicknameModal();
@@ -262,15 +262,15 @@ function _updateAuthUI() {
   } else if (cached) {
     el.innerHTML = avatarLink(cached);
   } else {
-    if (_authResolved) _setCachedNavAvatar(null);   // confirmed signed out — drop the cache
+    if (_authResolved) _setCachedNavAvatar(null);   // confirmed signed out, drop the cache
     el.innerHTML = `${themeBtn}<button class="nav-avatar-btn" onclick="goToSignIn()" title="Sign in"><img class="nav-avatar nav-avatar-guest" src="asset/players/default.svg" alt=""></button>`;
   }
   _updateThemeBtn();
   _updateThemeIcons();
 }
 
-// Paint the nav immediately — the cached avatar for a returning user, else the
-// sign-in button — before the async session check, so nothing flickers in.
+// Paint the nav immediately, the cached avatar for a returning user, else the
+// sign-in button, before the async session check, so nothing flickers in.
 _updateAuthUI();
 
 // ── NICKNAME MODAL ────────────────────────────────────────────────────────────

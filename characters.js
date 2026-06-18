@@ -12,7 +12,7 @@ let csReportMonth = (() => {
 // used by the character_stats view ({ character, wins, games }).
 //
 // The per-character aggregation runs server-side (monthly_character_stats RPC)
-// rather than pulling every game_players row for the month into the browser —
+// rather than pulling every game_players row for the month into the browser,
 // consistent with the other stats surfaces, and immune to the ~1000-row cap.
 async function _loadMonthCharacterStats(monthStart) {
   const start = new Date(monthStart.getFullYear(), monthStart.getMonth(),     1);
@@ -122,7 +122,7 @@ async function _renderMonthlyReport() {
   const label = csReportMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const token = ++_csLoadToken;
 
-  // On a month change the cards already exist — keep them in place (dimmed) and
+  // On a month change the cards already exist, keep them in place (dimmed) and
   // just retarget the header, so the layout never collapses while loading. Only
   // the very first load (no cards yet) shows the spinner scaffold.
   if (host.querySelector('.cs-summary')) {
@@ -133,7 +133,7 @@ async function _renderMonthlyReport() {
   }
 
   const monthly = await _loadMonthCharacterStats(csReportMonth);
-  if (token !== _csLoadToken) return;   // a newer month was requested — ignore stale result
+  if (token !== _csLoadToken) return;   // a newer month was requested, ignore stale result
   host.classList.remove('cs-report-loading');
   host.innerHTML = _renderRosterSummary(monthly.stats, monthly.label, monthly.gameCount, false);
 }
@@ -193,7 +193,7 @@ function _renderRosterSummary(rows, monthLabel, gameCount, loading = false) {
   const fmtGames = r => String(r.games);
 
   // While loading, the body is a skeleton with the same structure (Top/Bottom +
-  // three rows each) so the card is already the right height — no first-load jump.
+  // three rows each) so the card is already the right height, no first-load jump.
   const skelRow  = `<div class="cs-mini-row cs-skel"><span class="cs-skel-dot"></span><span class="cs-skel-bar"></span></div>`;
   const skelBody = `<div class="cs-mini-section-lbl">Top</div>${skelRow.repeat(3)}<div class="cs-mini-section-lbl">Bottom</div>${skelRow.repeat(3)}`;
 
@@ -232,6 +232,8 @@ function _renderRosterSummary(rows, monthLabel, gameCount, loading = false) {
 let csMode    = 'pct';   // 'pct' | 'count' | 'games'
 let csChar    = null;      // character record from DB
 let csBuckets = null;      // computed stats per player count
+let csAdversaries = [];    // head-to-head rows from the character_adversary_stats RPC
+let csRivalMode   = 'pct';   // rivalries metric (also the ranking key): 'pct' (% dominance) | 'count' (# wins/losses)
 let csAllChars  = [];        // full character list for search
 let csAvgDur    = null;      // avg game duration (minutes) across this character's games
 let csAvgTurns  = null;      // avg rounds across this character's games
@@ -316,16 +318,22 @@ async function renderDetailPage(charName) {
 
   csBuckets = _foldBuckets(buckets);
 
-  // Avg duration / rounds across every game this character was played in (one row
-  // per game — a character appears at most once per game).
-  // Paged past the ~1000-row response cap so a heavily-played character's averages
-  // aren't computed from a truncated sample.
-  const { rows: dgames } = await _fetchAllRows(() => db
-    .from('game_players')
-    .select('games(duration_minutes, num_turns)')
-    .eq('character', charName));
-  csAvgDur   = avg(dgames.map(r => r.games?.duration_minutes));
-  csAvgTurns = avg(dgames.map(r => r.games?.num_turns));
+  // Avg duration / rounds across every game this character was played in (one
+  // row per game), plus its head-to-head record vs every other character (one
+  // RPC). Fetched together. _fetchAllRows pages past the ~1000-row cap so a
+  // heavily-played character's averages aren't computed from a truncated sample.
+  const [{ rows: dgames }, { data: adv }] = await Promise.all([
+    _fetchAllRows(() => db
+      .from('game_players')
+      .select('games(duration_minutes, num_turns)')
+      .eq('character', charName)),
+    db.rpc('character_adversary_stats', { char_name: charName }),
+  ]);
+  csAvgDur     = avg(dgames.map(r => r.games?.duration_minutes));
+  csAvgTurns   = avg(dgames.map(r => r.games?.num_turns));
+  csAdversaries = (adv || []).map(a => ({
+    opponent: a.opponent, wins: Number(a.wins), losses: Number(a.losses), games: Number(a.games),
+  }));
 
   render();
   await renderFaq(charName);
@@ -366,6 +374,11 @@ function csSetMode(m) {
   render();
 }
 
+function csSetRivalMode(m) {
+  csRivalMode = m;
+  render();
+}
+
 // ── SEARCH / AUTOCOMPLETE ─────────────────────────────────────────────────────
 
 function _attachCharSearch() {
@@ -401,11 +414,7 @@ function render() {
     { label: '6p', key: 6 },
   ];
 
-  const maxVal = Math.max(...rows.map(r => {
-    const b = csBuckets[r.key];
-    if (!b.games) return 0;
-    return csMode === 'count' ? b.wins : csMode === 'games' ? b.games : b.wins / b.games;
-  })) || 1;
+  const maxVal = Math.max(...rows.map(r => statValue(csBuckets[r.key], csMode))) || 1;
 
   const overall  = csBuckets.all;
   const csWinPct = overall.games ? Math.round((overall.wins / overall.games) * 100) : 0;
@@ -420,30 +429,19 @@ function render() {
         { val: overall.wins,    lbl: 'Wins' },
       ])}
     </div>
-    <div class="controls mb-1">
-      <div class="seg">
-        <button class="seg-btn ${csMode === 'pct'   ? 'on' : ''}" onclick="csSetMode('pct')">% Wins</button>
-        <button class="seg-btn ${csMode === 'count' ? 'on' : ''}" onclick="csSetMode('count')"># Wins</button>
-        <button class="seg-btn ${csMode === 'games' ? 'on' : ''}" onclick="csSetMode('games')"># Games</button>
-      </div>
-    </div>
+    ${statModeSegHTML(csMode, 'csSetMode')}
     <div class="lb-table cs-table mb-1-25">
       <div class="lb-head">
         <span>Players</span>
         <span></span>
-        <span class="text-right">${csMode === 'count' ? '# Wins' : csMode === 'games' ? '# Games' : '% Wins'}</span>
-        <span class="text-right">${csMode === 'games' ? '# Wins' : '# Games'}</span>
+        <span class="text-right">${statValueLabel(csMode)}</span>
+        <span class="text-right">${statSecondaryLabel(csMode)}</span>
       </div>
       ${rows.map(r => {
-        const b       = csBuckets[r.key];
-        const pct     = b.games ? b.wins / b.games : 0;
-        const barW    = b.games
-          ? Math.round(((csMode === 'count' ? b.wins : csMode === 'games' ? b.games : pct) / maxVal) * 100)
-          : 0;
-        const dispVal = b.games
-          ? (csMode === 'count' ? b.wins : csMode === 'games' ? b.games : Math.round(pct * 100) + '%')
-          : '-';
-        const secondary = csMode === 'games' ? b.wins : b.games;
+        const b         = csBuckets[r.key];
+        const barW      = b.games ? statBarWidth(b, csMode, maxVal) : 0;
+        const dispVal   = b.games ? statValueDisplay(b, csMode) : '-';
+        const secondary = statSecondaryValue(b, csMode);
         return `
           <div class="lb-row">
             <div class="row-label">${r.label}</div>
@@ -456,6 +454,63 @@ function render() {
             <div class="row-games">${secondary}</div>
           </div>`;
       }).join('')}
+    </div>
+    ${_adversariesSectionHTML()}`;
+}
+
+// "Rivalries": the opponents this character has beaten most / lost to most,
+// from the character_adversary_stats RPC. Top-5 per column (a character can
+// appear in both: a close rivalry). The %/# seg ranks AND labels each column by
+// win/loss rate or raw count; the selected metric shows first, the other after
+// a "|". Empty when there is no record yet (or the RPC is not installed).
+function _adversariesSectionHTML() {
+  if (!csAdversaries.length) return '';
+
+  // % = wins or losses / games vs that opponent (third-player wins mean
+  // win% + loss% can be < 100%). The seg also picks the ranking key.
+  const pct     = (n, g) => g ? Math.round((n / g) * 100) : 0;
+  const winKey  = a => csRivalMode === 'pct' ? pct(a.wins,   a.games) : a.wins;
+  const lossKey = a => csRivalMode === 'pct' ? pct(a.losses, a.games) : a.losses;
+
+  const byWins = csAdversaries.filter(a => a.wins > 0)
+    .sort((a, b) => winKey(b) - winKey(a) || b.wins - a.wins || a.opponent.localeCompare(b.opponent)).slice(0, 5);
+  const byLoss = csAdversaries.filter(a => a.losses > 0)
+    .sort((a, b) => lossKey(b) - lossKey(a) || b.losses - a.losses || a.opponent.localeCompare(b.opponent)).slice(0, 5);
+  if (!byWins.length && !byLoss.length) return '';
+
+  // Row label: the selected metric first, the other after a "|".
+  const winsTxt = a => {
+    const c = `${a.wins} ${a.wins === 1 ? 'win' : 'wins'}`, p = `${pct(a.wins, a.games)}%`;
+    return csRivalMode === 'pct' ? `${p} | ${c}` : `${c} | ${p}`;
+  };
+  const lossTxt = a => {
+    const c = `${a.losses} ${a.losses === 1 ? 'loss' : 'losses'}`, p = `${pct(a.losses, a.games)}%`;
+    return csRivalMode === 'pct' ? `${p} | ${c}` : `${c} | ${p}`;
+  };
+  const seg = `<div class="seg cs-adv-seg">
+    <button class="seg-btn ${csRivalMode === 'pct'   ? 'on' : ''}" type="button" onclick="csSetRivalMode('pct')" title="Rank by win/loss %">%</button>
+    <button class="seg-btn ${csRivalMode === 'count' ? 'on' : ''}" type="button" onclick="csSetRivalMode('count')" title="Rank by win/loss count">#</button>
+  </div>`;
+  const row = (opponent, countText) => `
+    <a class="cs-adv-row" href="characters.html?char=${encodeURIComponent(opponent)}">
+      ${charImgHTML(opponent)}
+      <span class="cs-adv-name">${_esc(opponent)}</span>
+      <span class="cs-adv-count">${countText}</span>
+    </a>`;
+  const col = (title, rowsHTML) => `
+    <div class="cs-adv-col">
+      <div class="cs-adv-title">${title}</div>
+      ${rowsHTML || '<div class="cs-adv-empty">-</div>'}
+    </div>`;
+
+  return `
+    <div class="pf-games-header">
+      <span class="pf-games-title">Rivalries</span>
+      ${seg}
+    </div>
+    <div class="cs-adv">
+      ${col('Beaten most',  byWins.map(a => row(a.opponent, winsTxt(a))).join(''))}
+      ${col('Lost to most', byLoss.map(a => row(a.opponent, lossTxt(a))).join(''))}
     </div>`;
 }
 

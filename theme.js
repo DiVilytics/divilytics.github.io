@@ -77,7 +77,7 @@ function _updateThemeColor() {
 }
 
 // Drive the SVG favicon from the app's own theme (the in-page light/dark
-// toggle), not the OS `prefers-color-scheme` — otherwise it only follows the
+// toggle), not the OS `prefers-color-scheme`, otherwise it only follows the
 // system and ignores the user's choice.
 function _updateFavicon() {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
@@ -93,7 +93,7 @@ function _updateFavicon() {
   const svgHref = (isLight ? '/asset/favicon/favicon-light.svg' : '/asset/favicon/favicon-dark.svg') + V;
   if (svg.getAttribute('href') !== svgHref) svg.setAttribute('href', svgHref);
 
-  // PNG fallback favicon — default file is the dark one; swap to the light
+  // PNG fallback favicon, default file is the dark one; swap to the light
   // variant on light theme. If a browser ignores this, the dark default stays.
   const png = document.querySelector('link[rel="icon"][type="image/png"]');
   if (png) {

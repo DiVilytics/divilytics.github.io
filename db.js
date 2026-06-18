@@ -16,7 +16,7 @@ function _esc(s) {
 
 // ── PAGINATION HELPERS ────────────────────────────────────────────────────────
 // PostgREST caps a single response (commonly ~1000 rows). These let the client
-// assemble complete result sets past that cap — no server-side RPC needed.
+// assemble complete result sets past that cap, no server-side RPC needed.
 
 // Run an `.in(col, ids)` query in chunks of ids, keeping each response under the
 // row cap (and the URL short), then concatenate. `build(idChunk)` returns the
@@ -34,7 +34,7 @@ async function _fetchInChunks(ids, build, chunkSize = 150) {
 }
 
 // Page through a single query past the row cap with `.range()`. `build()` must
-// return a FRESH query builder each call. Returns { rows, error } — error is the
+// return a FRESH query builder each call. Returns { rows, error }, error is the
 // first page error, with whatever rows were gathered before it.
 async function _fetchAllRows(build, pageSize = 1000) {
   const rows = [];

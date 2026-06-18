@@ -7,12 +7,16 @@ function resolveAvatar(profile) {
   return profile?.avatar_url || profile?.default_avatar || 'asset/players/default.svg';
 }
 
+// The bundled preset avatars live at asset/players/1.jpeg … N.jpeg.
+const AVATAR_PRESET_COUNT = 19;
+function presetAvatarSrc(i) { return `asset/players/${i}.jpeg`; }
+
 // ── AVATAR MODEL ──────────────────────────────────────────────────────────────
 // An avatar value (the `avatar_url` column) is either a plain image path/URL
 // (preset photos, the default svg) OR a compact "recipe" describing a player-
 // built icon: a background colour plus one transparent PNG part per body slot,
 // stacked back-to-front. Recipes are rendered on the fly everywhere via
-// avatarHTML() — nothing rasterized is ever stored. Single source of truth for
+// avatarHTML(), nothing rasterized is ever stored. Single source of truth for
 // the parts, their order (= draw order), and per-part option counts:
 const AVATAR_BUILDER = {
   parts: [

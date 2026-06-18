@@ -245,7 +245,7 @@ function releaseCharacter(playerId) {
   openConfirmSheet({
     id:           'releaseConfirmOverlay',
     title:        'Release this character?',
-    bodyHTML:     `<p class="confirm-text">This frees up <strong class="text-emph">${charImgHTML(player.character)}${_esc(player.character)}</strong> so it can be claimed again — by you or another player.</p>`,
+    bodyHTML:     `<p class="confirm-text">This frees up <strong class="text-emph">${charImgHTML(player.character)}${_esc(player.character)}</strong> so it can be claimed again, by you or another player.</p>`,
     confirmLabel: 'Release',
     busyLabel:    'Releasing…',
     danger:       true,

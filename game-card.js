@@ -72,7 +72,7 @@ function buildGameCard(g, gp, { isSelf, actions, onLocationClick } = {}) {
 
 // ── GAME LIST HELPERS ───────────────────────────────────────────────────────
 // Shared bits of the game-log / player-profile lists (the lists themselves
-// paginate differently — server-side vs client-side — so only these are shared).
+// paginate differently, server-side vs client-side, so only these are shared).
 
 // A game's player rows in display order: by position, then id as a stable
 // tiebreaker. Returns a new array (never mutates the input).

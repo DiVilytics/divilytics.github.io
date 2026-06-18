@@ -9,6 +9,7 @@ let pfAllChars  = [];
 let pfAch       = new Map();
 let pfBoxInfo   = {};
 let pfGlobal    = null;
+let pfFriends   = [];   // top co-players by shared games (filter-independent)
 
 let pfMode           = 'pct';   // 'pct' | 'count' | 'games'
 let pfFilter         = 'all';   // 'all' | 2..6
@@ -99,7 +100,7 @@ async function load() {
 
   let gameIds = myRows.map(r => r.game_id);
 
-  // On your own profile, also include games you created — even ones you haven't
+  // On your own profile, also include games you created, even ones you haven't
   // claimed a character in (e.g. after releasing your claim). Otherwise such a
   // game would vanish from your profile, taking its manage/QR actions with it.
   const me      = getCurrentUser();
@@ -117,6 +118,7 @@ async function load() {
   pfPlayers = players;
   pfAch     = computeCharacterAchievements(players.filter(p => p.nickname === pfNick));
   pfGlobal  = computeGlobalAchievements(games, players, p => p.nickname === pfNick, pfAllChars);
+  pfFriends = await _loadFriends();
 
   document.getElementById('pfRoot').className = '';
 
@@ -128,6 +130,46 @@ async function load() {
   } catch (_) { _pfScrollToId = null; }
 
   render();
+}
+
+// Top co-players by shared games, the people this player plays with most. Only
+// counts games where THIS player actually had a seat, and ignores the page's
+// player-count / location / wins-only filters (it's an all-time relationship).
+async function _loadFriends() {
+  const myGameIds = new Set(pfPlayers.filter(p => p.nickname === pfNick).map(p => p.game_id));
+  const tally = new Map();   // co-player nickname → shared game count
+  for (const p of pfPlayers) {
+    if (!p.nickname || p.nickname === pfNick || !myGameIds.has(p.game_id)) continue;
+    tally.set(p.nickname, (tally.get(p.nickname) || 0) + 1);
+  }
+  const top = [...tally.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 5)
+    .map(([nick, games]) => ({ nick, games }));
+  if (!top.length) return [];
+
+  // One small query for just these nicknames' avatars.
+  const { data } = await db.from('profiles')
+    .select('nickname, avatar_url, default_avatar')
+    .in('nickname', top.map(f => f.nick));
+  const avatarByNick = Object.fromEntries((data || []).map(p => [p.nickname, resolveAvatar(p)]));
+  return top.map(f => ({ ...f, avatar: avatarByNick[f.nick] || 'asset/players/default.svg' }));
+}
+
+// The "Played with" section: a ranked list of the top co-players. Empty string
+// when this player has no nicknamed co-players (solo / all-unclaimed opponents).
+function _friendsSectionHTML() {
+  if (!pfFriends.length) return '';
+  const rows = pfFriends.map((f, i) => `
+    <a class="pf-friend" href="player.html?nick=${encodeURIComponent(f.nick)}">
+      <span class="pf-friend-rank">${i + 1}</span>
+      ${playerAvatarHTML(f.avatar)}
+      <span class="pf-friend-nick">${_esc(f.nick)}</span>
+      <span class="pf-friend-count">${f.games} game${f.games !== 1 ? 's' : ''}</span>
+    </a>`).join('');
+  return `
+    <div class="pf-games-header"><span class="pf-games-title">Most played with</span></div>
+    <div class="pf-friends">${rows}</div>`;
 }
 
 // ── CONTROLS ──────────────────────────────────────────────────────────────────
@@ -269,13 +311,7 @@ function render() {
       ])}
     </div>
 
-    <div class="controls mb-1">
-      <div class="seg">
-        <button class="seg-btn ${pfMode === 'pct'   ? 'on' : ''}" onclick="pfSetMode('pct')"   type="button">% Wins</button>
-        <button class="seg-btn ${pfMode === 'count' ? 'on' : ''}" onclick="pfSetMode('count')" type="button"># Wins</button>
-        <button class="seg-btn ${pfMode === 'games' ? 'on' : ''}" onclick="pfSetMode('games')" type="button"># Games</button>
-      </div>
-    </div>
+    ${statModeSegHTML(pfMode, 'pfSetMode')}
 
     ${renderStatTableHTML(charRows, {
       mode:        pfMode,
@@ -287,6 +323,8 @@ function render() {
       getSubHref:  key => pfCharBoxMap[key] ? `characters.html?box=${boxAnchorId(pfCharBoxMap[key])}` : '',
       wrapClass:   'mb-1-25',
     })}
+
+    ${_friendsSectionHTML()}
 
     ${achievementsSectionHTML({
       ach: pfAch, chars: pfAllChars, boxInfo: pfBoxInfo, global: pfGlobal,
@@ -300,7 +338,7 @@ function render() {
 
     <div class="pf-games-header">
       <span class="pf-games-title">Games</span>
-      ${pfLocationFilter ? `<button class="pill on" onclick="pfClearLocationFilter()" type="button">${_esc(pfLocationFilter)} | Clear</button>` : ''}
+      ${pfLocationFilter ? locationFilterPillHTML(pfLocationFilter, 'pfClearLocationFilter') : ''}
       <button class="pill" id="pfWinsOnlyBtn" onclick="pfToggleWinsOnly()" type="button">Wins only</button>
     </div>
     <div class="games-list" id="pfGamesList"></div>
@@ -334,8 +372,11 @@ function _renderGamesList(keepIds = pfFilteredGameIds()) {
   const list = document.getElementById('pfGamesList');
   if (!list) return;
   list.innerHTML = '';
+  // Pre-group players by game_id so each card is an O(1) lookup, not an O(n) scan.
+  const byGame = {};
+  for (const p of pfPlayers) (byGame[p.game_id] ||= []).push(p);
   for (const g of visible) {
-    const gp = sortGamePlayers(pfPlayers.filter(p => p.game_id === g.id));
+    const gp = sortGamePlayers(byGame[g.id] || []);
     list.appendChild(buildProfileCard(g, gp));
   }
   if (hasMore) appendLoadMore(list, pfLoadMore);

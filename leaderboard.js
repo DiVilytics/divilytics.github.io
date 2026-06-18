@@ -129,13 +129,7 @@ function render({ rows, summary }) {
   const hasMore = rows.length > lbDisplayLimit;
 
   document.getElementById('lb').innerHTML = `
-    <div class="controls mb-1">
-      <div class="seg">
-        <button class="seg-btn ${lbMode === 'pct'   ? 'on' : ''}" onclick="setMode('pct')">% Wins</button>
-        <button class="seg-btn ${lbMode === 'count' ? 'on' : ''}" onclick="setMode('count')"># Wins</button>
-        <button class="seg-btn ${lbMode === 'games' ? 'on' : ''}" onclick="setMode('games')"># Games</button>
-      </div>
-    </div>
+    ${statModeSegHTML(lbMode, 'setMode')}
     ${renderStatTableHTML(rows, {
       mode:        lbMode,
       headLabel:   isChar ? 'Character' : 'Player',

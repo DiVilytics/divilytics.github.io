@@ -130,7 +130,7 @@ function toggleCharFilter() {
   if (!open) load(true);   // closing the menu commits the selection
 }
 
-// Updates the panel UI only. The game list is NOT refetched here — that happens
+// Updates the panel UI only. The game list is NOT refetched here, that happens
 // when the panel closes (Done or the toggle), so toggling characters never
 // reloads mid-edit.
 function updateFilterUI() {
@@ -158,7 +158,7 @@ function showErr(msg) {
   showError('err', msg, { scroll: true });
 }
 
-// "Done" just closes the panel — closing is what commits the selection.
+// "Done" just closes the panel, closing is what commits the selection.
 function applyCharFilter() {
   if (document.getElementById('charFilterPanel').classList.contains('open')) toggleCharFilter();
 }
@@ -177,7 +177,7 @@ function clearLocationFilter() {
 
 async function loadLocationOptions() {
   // Show the location search only if at least one game has a location (cheap
-  // count-only request — no rows transferred).
+  // count-only request, no rows transferred).
   const { count } = await db.from('games')
     .select('location', { count: 'exact', head: true })
     .not('location', 'is', null);
@@ -207,7 +207,7 @@ function _applyLocationOption(loc) {
 // ── RENDER ────────────────────────────────────────────────────────────────────
 
 function render() {
-  // Don't render the empty/"no games" state before the first load has run —
+  // Don't render the empty/"no games" state before the first load has run,
   // otherwise the initAuth callback flashes it over the loading spinner.
   if (!_loaded) return;
 
@@ -217,7 +217,7 @@ function render() {
 
   const pillArea = document.getElementById('locationPillArea');
   if (pillArea) pillArea.innerHTML = glFilterLocation
-    ? `<button class="pill on" onclick="clearLocationFilter()">${_esc(glFilterLocation)} | Clear</button>`
+    ? locationFilterPillHTML(glFilterLocation, 'clearLocationFilter')
     : '';
 
   if (_totalGames === 0) {

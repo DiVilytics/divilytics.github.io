@@ -81,7 +81,7 @@ function _renderPage() {
         <div class="acct-identity-info">
           <div class="acct-nick">${_acctNick
             ? `<a class="acct-nick-link" href="player.html?nick=${encodeURIComponent(_acctNick)}" title="View my player page">${_esc(_acctNick)}</a>`
-            : '—'}</div>
+            : '-'}</div>
           ${metaLn ? `<div class="pf-since">${_esc(metaLn)}</div>` : ''}
           <button class="btn btn-ghost btn-sm acct-change-nick" onclick="changeNickname()">Change nickname</button>
         </div>
@@ -223,15 +223,14 @@ async function exportMyData() {
 
     // Full record of every game you took part in (date, location, duration,
     // rounds…), newest first, each with the complete list of players (character,
-    // result, seat) — so the export is self-contained, not just game ids.
+    // result, seat), so the export is self-contained, not just game ids.
     const gameIds = [...new Set(gpAll.rows.map(r => r.game_id))];
     const { games, players } = await fetchGamesWithPlayers(gameIds, { orderByPlayedAtDesc: true });
     const playersByGame = {};
     for (const p of players) (playersByGame[p.game_id] ||= []).push(p);
     const gamesOut = games.map(g => ({
       ...g,
-      players: (playersByGame[g.id] || []).sort((a, b) =>
-        (a.position ?? 999) - (b.position ?? 999) || (a.id < b.id ? -1 : 1)),
+      players: sortGamePlayers(playersByGame[g.id] || []),
     }));
 
     const payload = {
@@ -265,8 +264,8 @@ function _buildAvatarPicker() {
   const picker = document.getElementById('avatarPicker');
   if (!picker) return;
   picker.innerHTML = '';
-  for (let i = 1; i <= 19; i++) {
-    const value = `asset/players/${i}.jpeg`;
+  for (let i = 1; i <= AVATAR_PRESET_COUNT; i++) {
+    const value = presetAvatarSrc(i);
     const img   = document.createElement('img');
     img.className = 'avatar-option' + (value === _acctAvatar ? ' selected' : '');
     img.src   = value;
@@ -280,7 +279,7 @@ function _buildAvatarPicker() {
 }
 
 // The large identity avatar (left of the nickname) is the live preview of the
-// pending selection — a clicked preset or the in-progress build. It's only
+// pending selection, a clicked preset or the in-progress build. It's only
 // written to the profile when the user presses "Use this icon".
 function _renderPreview() {
   const host = document.getElementById('acctAvatarPreviewWrap');
@@ -288,7 +287,7 @@ function _renderPreview() {
 }
 
 // Clicking a preset previews it (highlights it + shows it large) but does not
-// save — saving happens on "Use this icon".
+// save, saving happens on "Use this icon".
 function _previewAvatar(value) {
   _pendingAvatar = value;
   document.querySelectorAll('#avatarPicker .avatar-option').forEach(el =>
@@ -313,13 +312,13 @@ function _syncCommitBtn() {
   _syncRemoveBtn();   // the Default button also depends on the pending preview
 }
 
-// 🎲 — random preset on the Presets tab, random composition on the Build tab.
+// 🎲, random preset on the Presets tab, random composition on the Build tab.
 function randomizeAvatar() {
   const builderPane = document.getElementById('avatarPaneBuilder');
   if (builderPane && !builderPane.hidden) {
     avatarBuilder.randomize();
   } else {
-    _previewAvatar(`asset/players/${1 + Math.floor(Math.random() * 19)}.jpeg`);
+    _previewAvatar(presetAvatarSrc(1 + Math.floor(Math.random() * AVATAR_PRESET_COUNT)));
   }
 }
 
@@ -364,14 +363,14 @@ async function commitAvatar() {
 }
 
 // "Default" stages the default icon as a pending selection (like clicking a
-// preset); Apply commits it. Disabled once the preview is already the default —
+// preset); Apply commits it. Disabled once the preview is already the default,
 // i.e. there's nothing left to clear.
 function _syncRemoveBtn() {
   const btn = document.getElementById('removeAvatarBtn');
   if (btn) btn.disabled = !_pendingAvatar;
 }
 
-// Preview the default icon. No DB write — Apply persists it, matching every
+// Preview the default icon. No DB write, Apply persists it, matching every
 // other control in the editor (presets, build, random).
 function removeAvatar() {
   _pendingAvatar = null;

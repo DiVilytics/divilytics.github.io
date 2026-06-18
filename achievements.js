@@ -80,7 +80,7 @@ function countBoxAchievements(boxRows) {
   return { earned, total: boxRows.length * 2 };
 }
 
-// Compact strip of box covers — grayscale until the box is fully played (then
+// Compact strip of box covers, grayscale until the box is fully played (then
 // full colour, mirroring the box picker), with a gold star (played all) and cup
 // (won all) marker beneath.
 function renderBoxStripHTML(boxRows, onClickFn = '_showBoxDetail') {
@@ -160,7 +160,7 @@ function _tierIndex(count, tiers) {
   return t;
 }
 
-// Tiered medal for any tier set — star (plays) / cup (wins), tinted by tier.
+// Tiered medal for any tier set, star (plays) / cup (wins), tinted by tier.
 function tierMedalHTML(count, tiers, kind) {
   const isCup = kind === 'cup';
   const t = _tierIndex(count, tiers);

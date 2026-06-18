@@ -41,7 +41,7 @@ function attachLocationAutocomplete(inputId, dropdownId) {
 }
 
 // Wires up a typeahead input + dropdown. Every page that has a search box
-// previously had three near-identical wrappers (input/blur/keydown) — this
+// previously had three near-identical wrappers (input/blur/keydown), this
 // helper replaces them with a single registration call.
 //
 // Required opts:

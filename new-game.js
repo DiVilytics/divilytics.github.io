@@ -39,7 +39,7 @@ const pace = createPaceFilter({
 async function init() {
   setActiveNav('new-game.html');
 
-  // Build the default layout synchronously — the date and the two starter rows —
+  // Build the default layout synchronously, the date and the two starter rows,
   // BEFORE the network awaits, so the form doesn't render empty (0 rows, no date,
   // "Add player" at the top) and then visibly fill in / shift once JS finishes.
   // The character <select> options fill in once chars load (no visible change);
@@ -57,7 +57,7 @@ async function init() {
     await pace.loadOwnedBoxes();
     pace.updatePaceUI();
     // Re-render slots only on a genuine sign-in/out (auth id change), not on the
-    // initial auth event or token refreshes — those are redundant here.
+    // initial auth event or token refreshes, those are redundant here.
     const uid = getCurrentUser()?.id || null;
     const changed = _lastAuthId !== undefined && _lastAuthId !== uid;
     _lastAuthId = uid;
@@ -72,7 +72,7 @@ async function init() {
     document.getElementById('excludeGrid'),
     chars,
     pace.excluded,
-    _onPillToggle
+    updateExcludeUI
   );
   onBeforeSignIn(_savePendingState);
   const restored = _restorePendingState();
@@ -157,12 +157,6 @@ function _setDateToNow() {
   document.getElementById('fDate').value = now.toISOString().slice(0, 16);
 }
 
-// A grid pill (or a box-name bulk toggle) changed the excluded set. The grid has
-// already mutated `excluded`; just refresh the dependent UI.
-function _onPillToggle(name, nowExcluded) {
-  updateExcludeUI();
-}
-
 // ── EXCLUDE CONTROLS ─────────────────────────────────────────────────────────
 
 function toggleExclude() {
@@ -194,7 +188,7 @@ function applyExclude() {
 // ── PACE / MINE SELECTION ─────────────────────────────────────────────────────
 // Pace is a single-select *inclusion* filter: clicking a colour RESETS the pool
 // to that colour's characters (or the colour plus its neighbours when Pace+ is
-// on) — it is not additive. "Mine" is a sticky toggle that further limits the
+// on), it is not additive. "Mine" is a sticky toggle that further limits the
 // pool to your boxes, and every reset takes it into account. The per-character
 // pills below let you fine-tune on top after a reset. All of this lives in the
 // shared pace-filter controller; these are just the toolbar's onclick targets.
@@ -205,7 +199,7 @@ function toggleMine()      { pace.toggleMine(); }
 
 // ── PLAYERS LEGEND LAYOUT ─────────────────────────────────────────────────────
 // Lay the legend out in balanced rows: keep it on one line if it fits, otherwise
-// split it in half — and recurse on each half — so rows stay even ("2 + 2", never
+// split it in half, and recurse on each half, so rows stay even ("2 + 2", never
 // "3 + 1"), and the " | " separators only ever sit between items on a row.
 let _legendResizeId = null;
 
@@ -220,7 +214,7 @@ function _layoutLegend() {
     + `font:${cs.fontWeight} ${cs.fontSize}/${cs.lineHeight} ${cs.fontFamily};letter-spacing:${cs.letterSpacing};`;
   document.body.appendChild(meas);
   const maxW = host.clientWidth;
-  if (!maxW) { meas.remove(); return; }   // hidden (e.g. live game) — keep current markup
+  if (!maxW) { meas.remove(); return; }   // hidden (e.g. live game), keep current markup
   const fits = arr => { meas.textContent = arr.join('  |  '); return meas.offsetWidth <= maxW; };
 
   const split = arr => {
@@ -340,7 +334,7 @@ function drawSlot(id) {
       clearInterval(slotTimers[id]);
       delete slotTimers[id];
 
-      // Land this slot IN PLACE — set its character and drop only its own
+      // Land this slot IN PLACE, set its character and drop only its own
       // highlight. We deliberately don't re-render the whole list here, so the
       // other slots keep spinning and each clears its highlight as it lands
       // (sequentially, in the same order they started).
@@ -397,21 +391,21 @@ function shuffleOrder() {
   const container = document.getElementById('orderSlots');
   const slotEls   = container ? [...container.querySelectorAll('.order-slot')] : [];
   if (slotEls.length !== orderSlots.length) {
-    // No DOM to animate — just render the result.
+    // No DOM to animate, just render the result.
     renderOrderSlots();
     _saveLiveState();
     return;
   }
 
-  // Slot-machine shuffle: every row flashes through random orderings — each frame
-  // a fresh permutation, so it reads as a genuine all-over shuffle — with each
+  // Slot-machine shuffle: every row flashes through random orderings, each frame
+  // a fresh permutation, so it reads as a genuine all-over shuffle, with each
   // character carrying its previous number, then settles on the real result
   // (numbers back in ascending order). Blue .spinning highlight throughout. Same
   // total length as the draw, but fewer, longer-held frames so it feels slower.
   slotEls.forEach(el => el.classList.add('spinning'));
 
   const FRAME_MS = 100;                         // longer hold per frame than the draw's 50ms
-  const total    = Math.round(1000 / FRAME_MS); // 1s total — same as the draw, fewer frames
+  const total    = Math.round(1000 / FRAME_MS); // 1s total, same as the draw, fewer frames
   let ticks = 0;
   _shuffleTimer = setInterval(() => {
     ticks++;
@@ -433,7 +427,7 @@ function shuffleOrder() {
       const nameEl   = el.querySelector('.order-slot-name');
       const numEl    = el.querySelector('.row-num');
       if (portrait) portrait.src = s.char ? charImgSrc(s.char) : 'asset/players/default.svg';
-      if (nameEl)   nameEl.textContent = s.char || '— Character —';
+      if (nameEl)   nameEl.textContent = s.char || 'Character';
       if (numEl)    numEl.textContent = origPos.get(s.id) + '.';
     });
   }, FRAME_MS);
@@ -452,7 +446,7 @@ function renderOrderSlots() {
     const taken     = new Set(orderSlots.filter(o => o.id !== s.id && o.char).map(o => o.char));
     const available = chars.filter(c => !taken.has(c.name));
     const src       = s.char ? charImgSrc(s.char) : 'asset/players/default.svg';
-    const nameTxt   = s.char ? _esc(s.char) : '<span class="order-slot-empty">— Character —</span>';
+    const nameTxt   = s.char ? _esc(s.char) : '<span class="order-slot-empty">Character</span>';
     const meTitle   = isAuthed ? 'My character' : 'Sign in to mark your character';
     return `
       <div class="order-slot" data-id="${s.id}">
@@ -486,7 +480,7 @@ function renderOrderSlots() {
 
 function _updateActionBtns() {
   // While a draw or shuffle is animating, hold the draw/shuffle/start/save
-  // buttons disabled — so they don't flicker as slots fill in one by one, and
+  // buttons disabled, so they don't flicker as slots fill in one by one, and
   // can't be re-triggered mid-animation. They're recomputed once it settles.
   const animating = !!_shuffleTimer || Object.keys(slotTimers).length > 0;
 
@@ -511,7 +505,7 @@ function _updateActionBtns() {
     shuffleBtn.disabled = animating || filled < 2;
     shuffleBtn.title    = animating ? '' : (filled < 2 ? 'Pick at least 2 characters first' : '');
   }
-  // Start lights up once the lineup is complete — every player has a different
+  // Start lights up once the lineup is complete, every player has a different
   // character and "me" is marked. Save additionally needs the winner marked.
   // Until then they grey out (with the reason as a tooltip). Date/sign-in are
   // still validated in the handlers.
