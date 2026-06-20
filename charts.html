@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-  <title>DiVilytics | Characters</title>
+  <title>DiVilytics | Charts</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
@@ -41,20 +41,18 @@
 </nav>
 
 <main>
-  <div class="page-header align-top">
-    <div>
-      <h2>Characters</h2>
-    </div>
-    <div class="cs-search hidden" id="csSearchWrap">
-      <input type="text" id="csSearchInput" placeholder="Jump to character…" autocomplete="off">
-      <div class="cs-dropdown" id="csDropdown"></div>
-    </div>
+  <div class="page-header">
+    <h2>Charts</h2>
   </div>
+  <p class="charts-intro">Visualizations across every recorded game. Pick a chart to view it.</p>
 
-  <div id="csIdentity"></div>
+  <div class="chart-picker" id="chartPicker"></div>
 
-  <div id="csRoot" class="spinner">Loading…</div>
-  <div id="csFaq"></div>
+  <div class="chart-card">
+    <div class="chart-card-desc" id="chartDesc"></div>
+    <div class="chart-stage" id="chartStage"></div>
+    <div class="chart-caption" id="chartCaption"></div>
+  </div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -68,6 +66,7 @@
   <script src="search.js"></script>
   <script src="game-card.js"></script>
   <script src="shared.js"></script>
-<script src="characters.js"></script>
+  <script src="chart-lib.js"></script>
+<script src="charts.js"></script>
 </body>
 </html>

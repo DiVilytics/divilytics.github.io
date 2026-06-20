@@ -171,7 +171,7 @@ nav {
   font-weight: 500;
   color: var(--muted);
   text-decoration: none;
-  padding: 5px 10px;
+  padding: 5px 8px;
   border-radius: var(--rs);
   transition: color 0.15s, background 0.15s;
 }
@@ -644,6 +644,58 @@ main {
 .cs-adv-count { flex-shrink: 0; font-size: 12px; color: var(--dim); }
 .cs-adv-empty { padding: 4px 14px 12px; color: var(--dim); font-size: 13px; }
 .cs-adv-seg .seg-btn { padding: 4px 11px; }
+
+/* ── CHARTS PAGE + CHART PRIMITIVES ───────────────────────────────────────── */
+.charts-intro { color: var(--muted); font-size: 14px; margin: 0 0 16px; }
+.chart-picker { margin-bottom: 16px; }
+.chart-select-wrap { position: relative; width: 100%; }
+.chart-chevron {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  pointer-events: none; color: var(--muted); font-size: 18px;
+  transition: transform 0.2s;
+}
+.chart-select:open ~ .chart-chevron { transform: translateY(-50%) rotate(180deg); }
+/* Inherits height/line-height/border/box-sizing/appearance from the global
+   select rule, which UA-centres the value; we only retune colour, weight, the
+   right padding for the chevron, and hide the global arrow. */
+.chart-select {
+  width: 100%;
+  font-size: 14px; font-weight: 600;
+  background: var(--s1);
+  background-image: none;
+  padding: 0 32px 0 12px;
+  cursor: pointer;
+}
+
+.chart-card {
+  background: var(--s1); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 16px;
+}
+.chart-card-desc { font-size: 13px; color: var(--muted); margin: 0 0 14px; line-height: 1.45; min-height: 4.4em; }
+.chart-stage { min-height: 240px; }
+.chart-note { color: var(--muted); font-size: 13px; text-align: center; padding: 60px 16px; }
+.chart-note code { background: var(--s3); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+.chart-caption { margin-top: 10px; min-height: 18px; font-size: 13px; font-weight: 600; color: var(--text); text-align: center; }
+.chart-caption-link { color: var(--accent); text-decoration: none; }
+
+/* SVG chart primitives (charts.js) */
+.chart-svg { width: 100%; height: auto; display: block; }
+.chart-svg text { font-family: inherit; pointer-events: none; }
+.ch-lbl { font-size: 11px; fill: var(--text); }
+.ch-val { font-size: 11px; fill: var(--muted); }
+.ch-ax  { font-size: 9.5px; fill: var(--muted); }
+.ch-axlbl { font-size: 10px; fill: var(--muted); }
+.ch-grid { stroke: var(--border); stroke-width: 1; }
+.ch-cellval { font-size: 10px; font-weight: 600; fill: #fff; }
+.ch-cell-empty { fill: var(--s2); }
+.ch-empty { font-size: 12px; fill: var(--muted); }
+.ch-hit { cursor: pointer; }
+.ch-hit.sel { stroke: var(--text); stroke-width: 2; }
+
+@media (hover: hover) {
+  .chart-select:hover { border-color: var(--s4); }
+  .chart-caption-link:hover { text-decoration: underline; }
+}
 
 /* Shared dark panel surface, game cards and the leaderboard / stats table. */
 .game-card,
@@ -2570,6 +2622,7 @@ select:disabled {
 /* ── HOVER STATES (pointer devices only) ─────────────────────────── */
 @media (hover: hover) {
   .nav-links a:hover                        { color: var(--text); background: var(--s2); }
+  .nav-brand:hover                          { opacity: 0.65; }
   .nav-avatar:hover                         { opacity: 0.75; }
   .nav-avatar-btn:hover .nav-avatar-guest   { opacity: 0.7; }
   .nav-icon-btn:hover                       { color: var(--text); background: var(--s2); }
@@ -2636,10 +2689,16 @@ select:disabled {
   /* Tighter box picker: lets 3 columns fit instead of 2, keeping cover art
      a comfortable size on phones. */
   .box-picker { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
+  /* Charts scale down on phones, so bump the in-SVG text up to stay legible. */
+  .ch-ax, .ch-axlbl, .ch-cellval { font-size: 12.5px; }
+  .ch-lbl, .ch-val               { font-size: 13.5px; }
+  /* Descriptions wrap to more lines on narrow screens; reserve more so the card
+     keeps a consistent height across charts. */
+  .chart-card-desc { min-height: 7.3em; }
 }
 
 @media (max-width: 360px) {
-  .nav-links a { padding: 5px 8px; font-size: 12px; }
+  .nav-links a { padding: 4px 6px; font-size: 12px; }
   .draw-mode-row                  { gap: 4px; }
   .filter-bulk-row .pace-colors   { gap: 2px; }
   .filter-bulk-row .pace-color    { width: 20px; height: 20px; }
