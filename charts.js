@@ -47,12 +47,20 @@ async function _sizeStats() {
   return _data.sizeStats;
 }
 
+// Games-per-player counts (player_stats view); players with at least one game.
+async function _playerStats() {
+  if (_data.playerStats) return _data.playerStats;
+  const { rows } = await _fetchAllRows(() => db.from('player_stats').select('games'));
+  _data.playerStats = rows.map(r => Number(r.games)).filter(g => g > 0);
+  return _data.playerStats;
+}
+
 // ── CHART REGISTRY ─────────────────────────────────────────────────────────────
 // Each: { id, icon, label, desc, render() -> SVG/HTML string }.
 
 const CHARTS = [
   {
-    id: 'scatter', icon: '🎯', label: 'Win rate vs. popularity',
+    id: 'scatter', icon: '🎯', label: 'Win rate vs popularity',
     desc: 'Each villain by games played (x) and win rate (y); the axes zoom to the data. Up-left is strong but rarely picked, down-right is popular but weak. Tap a dot to open it.',
     async render() {
       const cs = (await _characterStats()).filter(c => c.games > 0);
@@ -64,6 +72,8 @@ const CHARTS = [
           label: c.name,
           color: c.pace ? `var(--pace-${c.pace})` : 'var(--accent)',
           href: `characters.html?char=${encodeURIComponent(c.name)}`,
+          box: c.box || null,
+          boxHref: c.box ? `characters.html?box=${boxAnchorId(c.box)}` : null,
           meta: `${c.games} games | ${pct}% win rate`,
         };
       });
@@ -81,7 +91,7 @@ const CHARTS = [
         const games = rows.reduce((a, c) => a + c.games, 0);
         const wins  = rows.reduce((a, c) => a + c.wins,  0);
         const pct   = games ? Math.round(wins / games * 100) : 0;
-        return { label: b[0].toUpperCase() + b.slice(1), value: pct, games, color: `var(--pace-${b})`, meta: `${pct}% win rate | ${games} games` };
+        return { label: b[0].toUpperCase() + b.slice(1), value: pct, games, color: `var(--pace-${b})`, meta: `${pct}% win rate | ${games} games | ${rows.length} villains` };
       }).filter(d => d.games > 0);
       return Charts.barsH(data, { fmt: (v, d) => `${v}% (${d.games})`, labelW: 60 });
     },
@@ -90,26 +100,60 @@ const CHARTS = [
     id: 'box', icon: '📦', label: 'Win rate by box',
     desc: "Each expansion box's overall win rate, pooling every villain in the box (total wins over total games). The number in parentheses is the box's total games played; bars are sorted strongest first.",
     async render() {
+      const [cs, boxInfo] = await Promise.all([_characterStats(), loadBoxInfo()]);
       const byBox = {};
-      for (const c of await _characterStats()) {
+      for (const c of cs) {
         if (!c.box) continue;
-        (byBox[c.box] ||= { games: 0, wins: 0 });
+        (byBox[c.box] ||= { games: 0, wins: 0, villains: 0 });
         byBox[c.box].games += c.games;
         byBox[c.box].wins  += c.wins;
+        byBox[c.box].villains++;
       }
       const data = Object.entries(byBox)
         .filter(([, v]) => v.games > 0)
         .map(([box, v]) => {
-          const pct = Math.round(v.wins / v.games * 100);
-          return { label: box, value: pct, games: v.games, meta: `${pct}% win rate | ${v.games} games` };
+          const pct  = Math.round(v.wins / v.games * 100);
+          const year = boxInfo[box]?.year;
+          return {
+            label: box,
+            value: pct,
+            games: v.games,
+            href: `characters.html?box=${boxAnchorId(box)}`,
+            meta: `${year ? year + ' | ' : ''}${pct}% win rate | ${v.games} games | ${v.villains} villains`,
+          };
         })
         .sort((a, b) => b.value - a.value);
       return Charts.barsH(data, { fmt: (v, d) => `${v}% (${d.games})`, labelW: 152 });
     },
   },
   {
-    id: 'duration', icon: '⏱️', label: 'Game length',
-    desc: 'How many games fall into each 15-minute length band (0-15, 15-30, and so on); the band start in minutes is under each bar. Counts only games with a recorded duration.',
+    id: 'boxpop', icon: '🔥', label: 'Box popularity',
+    desc: "How often each box's villains are picked across all recorded games. Bars are sorted most-played first; tap one to open the box.",
+    async render() {
+      const byBox = {};
+      let total = 0;
+      for (const c of await _characterStats()) {
+        if (!c.box) continue;
+        (byBox[c.box] ||= { games: 0, villains: 0 });
+        byBox[c.box].games += c.games;
+        byBox[c.box].villains++;
+        total += c.games;
+      }
+      const data = Object.entries(byBox)
+        .filter(([, v]) => v.games > 0)
+        .map(([box, v]) => ({
+          label: box,
+          value: v.games,
+          href: `characters.html?box=${boxAnchorId(box)}`,
+          meta: `${Math.round(v.games / (total || 1) * 100)}% of all picks | ${v.villains} villains`,
+        }))
+        .sort((a, b) => b.value - a.value);
+      return Charts.barsH(data, { fmt: v => v, labelW: 152 });
+    },
+  },
+  {
+    id: 'duration', icon: '⏱️', label: 'Game duration',
+    desc: 'How many games fall into each 15-minute band (0-15, 15-30, and so on); the band start in minutes is under each bar. Counts only games with a recorded duration.',
     async render() {
       const vals = (await _gamesLite()).map(g => g.duration_minutes).filter(v => v != null);
       if (!vals.length) return Charts.barsV([]);
@@ -127,7 +171,7 @@ const CHARTS = [
     },
   },
   {
-    id: 'avglen', icon: '📏', label: 'Avg length by players',
+    id: 'avglen', icon: '⏳', label: 'Avg duration by players',
     desc: 'Average recorded game duration in minutes for each table size, from 2 to 6 players. Averaged only over games that recorded a duration.',
     async render() {
       const bySize = Object.fromEntries((await _sizeStats()).map(s => [s.size, s]));
@@ -139,7 +183,7 @@ const CHARTS = [
           label: `${size}p`,
           value: m,
           has,
-          meta: has ? `${m} min average` : (s && s.games > 0 ? 'no duration recorded' : 'no games recorded'),
+          meta: has ? `${m} min average | ${s.games} games` : (s && s.games > 0 ? 'no duration recorded' : 'no games recorded'),
         };
       });
       return Charts.barsH(data, { fmt: (v, d) => d.has ? `${v} min` : '-', labelW: 48 });
@@ -147,7 +191,7 @@ const CHARTS = [
   },
   {
     id: 'rounds', icon: '🔁', label: 'Rounds per game',
-    desc: 'How many games fall into each 3-round length band, grouped to smooth out noise. Counts only games with a recorded round count.',
+    desc: 'How many games fall into each 3-round band, grouped to smooth out noise. Counts only games with a recorded round count.',
     async render() {
       const vals = (await _gamesLite()).map(g => g.num_turns).filter(v => v != null);
       if (!vals.length) return Charts.barsV([]);
@@ -166,13 +210,31 @@ const CHARTS = [
     },
   },
   {
-    id: 'tablesize', icon: '🍩', label: 'Players per game',
+    id: 'tablesize', icon: '👥', label: 'Players per game',
     desc: 'Share of recorded games by table size, from 2 to 6 players. Tap a slice for its exact game count and percentage.',
     async render() {
       const ss = (await _sizeStats()).filter(s => s.games > 0);
       const total = ss.reduce((a, s) => a + s.games, 0) || 1;
       const segs = ss.map(s => ({ label: `${s.size}p`, value: s.games, meta: `${s.games} games | ${Math.round(s.games / total * 100)}%` }));
       return Charts.donut(segs);
+    },
+  },
+  {
+    id: 'perplayer', icon: '🎮', label: 'Games per player',
+    desc: 'How many games each player has recorded, as a distribution. Most players appear in a few games; a few are very active.',
+    async render() {
+      const vals = await _playerStats();
+      if (!vals.length) return Charts.barsV([]);
+      const max = Math.max(...vals);
+      const SIZE = Math.max(1, Math.ceil(max / 10));   // about 10 bands
+      const n = Math.floor((max - 1) / SIZE) + 1;
+      const buckets = Array.from({ length: n }, (_, b) => ({ lo: b * SIZE + 1, hi: (b + 1) * SIZE, value: 0 }));
+      for (const p of vals) buckets[Math.min(n - 1, Math.floor((p - 1) / SIZE))].value++;
+      for (const b of buckets) {
+        b.name = SIZE === 1 ? `${b.lo} game${b.lo === 1 ? '' : 's'}` : `${b.lo}-${b.hi} games`;
+        b.meta = `${b.value} player${b.value === 1 ? '' : 's'}`;
+      }
+      return Charts.barsV(buckets, { xTick: i => buckets[i].lo, xEvery: 1 });
     },
   },
   {
@@ -190,7 +252,23 @@ const CHARTS = [
     },
   },
   {
-    id: 'seatorder', icon: '🔢', label: 'Turn-order advantage',
+    id: 'weekday', icon: '📅', label: 'Games by weekday',
+    desc: 'Number of games recorded on each weekday, by play date. Weekday is derived from your local time zone.',
+    async render() {
+      const counts = new Array(7).fill(0);   // 0 = Sunday
+      for (const g of await _gamesLite()) {
+        if (!g.played_at) continue;
+        counts[new Date(g.played_at).getDay()]++;
+      }
+      const order  = [1, 2, 3, 4, 5, 6, 0];   // Monday first
+      const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const full   = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      const data = order.map((d, i) => ({ value: counts[d], name: full[i], meta: `${counts[d]} game${counts[d] === 1 ? '' : 's'}` }));
+      return Charts.barsV(data, { xTick: i => labels[i], xEvery: 1 });
+    },
+  },
+  {
+    id: 'seatorder', icon: '🪑', label: 'Turn-order advantage',
     desc: "Win rate of each seat in play order (seat 1 plays first) per table size. Warmer cells are above the fair share (1 / players); the cell shows the win rate. Recorded-seating games only.",
     async render() {
       const { data, error } = await db.rpc('position_stats');
@@ -278,9 +356,12 @@ async function init() {
     if (!cap) return;
     const name = hit.getAttribute('data-name') || '';
     const meta = hit.getAttribute('data-meta') || '';
-    const href = hit.getAttribute('data-href');
-    const nameHTML = href ? `<a class="chart-caption-link" href="${_esc(href)}">${_esc(name)}</a>` : _esc(name);
-    cap.innerHTML = meta ? `${nameHTML} | ${_esc(meta)}` : nameHTML;
+    const link = (text, h) => h ? `<a class="chart-caption-link" href="${_esc(h)}">${_esc(text)}</a>` : _esc(text);
+    const parts = [link(name, hit.getAttribute('data-href'))];
+    const box = hit.getAttribute('data-box');
+    if (box) parts.push(link(box, hit.getAttribute('data-boxhref')));   // secondary link, e.g. the scatter's box
+    if (meta) parts.push(_esc(meta));
+    cap.innerHTML = parts.join(' | ');
   });
   selectChart(CHARTS[0].id);
 }

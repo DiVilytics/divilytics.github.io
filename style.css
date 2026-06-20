@@ -2692,6 +2692,7 @@ select:disabled {
   /* Charts scale down on phones, so bump the in-SVG text up to stay legible. */
   .ch-ax, .ch-axlbl, .ch-cellval { font-size: 12.5px; }
   .ch-lbl, .ch-val               { font-size: 13.5px; }
+  .ch-dot                        { r: 7px; }   /* bigger scatter dots, tappable once the SVG shrinks */
   /* Descriptions wrap to more lines on narrow screens; reserve more so the card
      keeps a consistent height across charts. */
   .chart-card-desc { min-height: 7.3em; }

@@ -17,8 +17,8 @@ const Charts = (() => {
   // Interactive shape attributes: a class + data-* the page reads to pin a
   // caption ("name | meta") on tap, with an optional link. Every clickable shape
   // (bar, dot, arc, cell) gets these so all charts behave like the scatter.
-  function hit(name, meta, href) {
-    let a = ` class="ch-hit" data-name="${_esc(name == null ? '' : name)}" data-meta="${_esc(meta == null ? '' : meta)}"`;
+  function hit(name, meta, href, cls) {
+    let a = ` class="ch-hit${cls ? ' ' + cls : ''}" data-name="${_esc(name == null ? '' : name)}" data-meta="${_esc(meta == null ? '' : meta)}"`;
     if (href) a += ` data-href="${_esc(href)}"`;
     return a;
   }
@@ -99,9 +99,10 @@ const Charts = (() => {
     }
     // Dots carry the name + meta (+ optional href) so the page can show a
     // clickable caption on tap (the <title> hover tooltip does not fire on touch).
-    const dots = points.map(p =>
-      `<circle${hit(p.label, p.meta, p.href)} cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="5" fill="${p.color || 'var(--accent)'}" fill-opacity="0.85"><title>${titleText(p.label, p.meta)}</title></circle>`
-    ).join('');
+    const dots = points.map(p => {
+      const boxAttr = p.box ? ` data-box="${_esc(p.box)}" data-boxhref="${_esc(p.boxHref || '')}"` : '';
+      return `<circle${hit(p.label, p.meta, p.href, 'ch-dot')}${boxAttr} cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="5" fill="${p.color || 'var(--accent)'}" fill-opacity="0.85"><title>${titleText(p.label, p.meta)}</title></circle>`;
+    }).join('');
     const axis = xLabel ? `<text x="${((L + W - R) / 2).toFixed(1)}" y="${H - 6}" class="ch-axlbl" text-anchor="middle">${_esc(xLabel)}</text>` : '';
     return wrap(grid + dots + axis);
   }
