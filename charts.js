@@ -77,12 +77,12 @@ const CHARTS = [
           meta: `${c.games} games | ${pct}% win rate`,
         };
       });
-      return Charts.scatter(points, { xLabel: 'Games played', yFmt: v => Math.round(v) + '%', yMax: 100 });
+      return Charts.scatter(points, { xLabel: 'Games played', ySuffix: '%', yMax: 100 });
     },
   },
   {
     id: 'pace', icon: '🎨', label: 'Win rate by pace',
-    desc: "Each pace band's overall win rate, pooling every villain of that colour (total wins over total games). The number in parentheses is the band's total games played.",
+    desc: "Each pace band's overall win rate, pooling every villain of that colour (total wins over total games). Tap a band for its games and villains.",
     async render() {
       const cs = await _characterStats();
       const bands = ['green', 'yellow', 'orange', 'red'];
@@ -93,12 +93,12 @@ const CHARTS = [
         const pct   = games ? Math.round(wins / games * 100) : 0;
         return { label: b[0].toUpperCase() + b.slice(1), value: pct, games, color: `var(--pace-${b})`, meta: `${pct}% win rate | ${games} games | ${rows.length} villains` };
       }).filter(d => d.games > 0);
-      return Charts.barsH(data, { fmt: (v, d) => `${v}% (${d.games})`, labelW: 60 });
+      return Charts.barsH(data, { axisFmt: v => `${v}%`, labelW: 60 });
     },
   },
   {
     id: 'box', icon: '📦', label: 'Win rate by box',
-    desc: "Each expansion box's overall win rate, pooling every villain in the box (total wins over total games). The number in parentheses is the box's total games played; bars are sorted strongest first.",
+    desc: "Each expansion box's overall win rate, pooling every villain in the box (total wins over total games); bars are sorted strongest first. Tap a box for its total games.",
     async render() {
       const [cs, boxInfo] = await Promise.all([_characterStats(), loadBoxInfo()]);
       const byBox = {};
@@ -123,16 +123,17 @@ const CHARTS = [
           };
         })
         .sort((a, b) => b.value - a.value);
-      return Charts.barsH(data, { fmt: (v, d) => `${v}% (${d.games})`, labelW: 152 });
+      return Charts.barsH(data, { axisFmt: v => `${v}%`, labelW: 152 });
     },
   },
   {
     id: 'boxpop', icon: '🔥', label: 'Box popularity',
     desc: "How often each box's villains are picked across all recorded games. Bars are sorted most-played first; tap one to open the box.",
     async render() {
+      const [cs, boxInfo] = await Promise.all([_characterStats(), loadBoxInfo()]);
       const byBox = {};
       let total = 0;
-      for (const c of await _characterStats()) {
+      for (const c of cs) {
         if (!c.box) continue;
         (byBox[c.box] ||= { games: 0, villains: 0 });
         byBox[c.box].games += c.games;
@@ -141,14 +142,17 @@ const CHARTS = [
       }
       const data = Object.entries(byBox)
         .filter(([, v]) => v.games > 0)
-        .map(([box, v]) => ({
-          label: box,
-          value: v.games,
-          href: `characters.html?box=${boxAnchorId(box)}`,
-          meta: `${Math.round(v.games / (total || 1) * 100)}% of all picks | ${v.villains} villains`,
-        }))
+        .map(([box, v]) => {
+          const year = boxInfo[box]?.year;
+          return {
+            label: box,
+            value: v.games,
+            href: `characters.html?box=${boxAnchorId(box)}`,
+            meta: `${year ? year + ' | ' : ''}${v.games} picks | ${Math.round(v.games / (total || 1) * 100)}% of all picks | ${v.villains} villains`,
+          };
+        })
         .sort((a, b) => b.value - a.value);
-      return Charts.barsH(data, { fmt: v => v, labelW: 152 });
+      return Charts.barsH(data, { labelW: 152 });
     },
   },
   {
@@ -186,7 +190,7 @@ const CHARTS = [
           meta: has ? `${m} min average | ${s.games} games` : (s && s.games > 0 ? 'no duration recorded' : 'no games recorded'),
         };
       });
-      return Charts.barsH(data, { fmt: (v, d) => d.has ? `${v} min` : '-', labelW: 48 });
+      return Charts.barsH(data, { labelW: 48 });
     },
   },
   {
@@ -204,7 +208,7 @@ const CHARTS = [
       for (const b of buckets) { b.name = `${b.lo}-${b.hi} rounds`; b.meta = `${b.value} game${b.value === 1 ? '' : 's'}`; }
       return Charts.barsV(buckets, {
         fmt: (v, d) => `${d.lo}-${d.hi} rounds: ${v}`,
-        xTick: i => `${buckets[i].lo}-${buckets[i].hi}`,
+        xTick: i => buckets[i].lo,
         xEvery: 1,
       });
     },
@@ -226,15 +230,15 @@ const CHARTS = [
       const vals = await _playerStats();
       if (!vals.length) return Charts.barsV([]);
       const max = Math.max(...vals);
-      const SIZE = Math.max(1, Math.ceil(max / 10));   // about 10 bands
+      const SIZE = 4;   // fixed 4-game bands (1-4, 5-8, ...)
       const n = Math.floor((max - 1) / SIZE) + 1;
       const buckets = Array.from({ length: n }, (_, b) => ({ lo: b * SIZE + 1, hi: (b + 1) * SIZE, value: 0 }));
       for (const p of vals) buckets[Math.min(n - 1, Math.floor((p - 1) / SIZE))].value++;
       for (const b of buckets) {
-        b.name = SIZE === 1 ? `${b.lo} game${b.lo === 1 ? '' : 's'}` : `${b.lo}-${b.hi} games`;
+        b.name = `${b.lo}-${b.hi} games`;
         b.meta = `${b.value} player${b.value === 1 ? '' : 's'}`;
       }
-      return Charts.barsV(buckets, { xTick: i => buckets[i].lo, xEvery: 1 });
+      return Charts.barsV(buckets, { xTick: i => buckets[i].lo, xEvery: Math.max(1, Math.ceil(n / 12)) });
     },
   },
   {
@@ -307,6 +311,7 @@ function _needRpc(name) {
 // ── PICKER + RENDER ────────────────────────────────────────────────────────────
 
 let _selected = null;
+let _lastPanEnd = 0;   // timestamp of the last scatter pan/pinch; suppresses the click that ends it
 
 function _renderPicker() {
   document.getElementById('chartPicker').innerHTML =
@@ -327,10 +332,124 @@ async function selectChart(id) {
   stage.innerHTML = `<div class="chart-note">Loading…</div>`;
   try {
     stage.innerHTML = await c.render();
+    const z = stage.querySelector('.ch-zoomable');
+    if (z) _attachZoom(z);
   } catch (e) {
     console.error('chart render failed:', e);
     stage.innerHTML = `<div class="chart-note">Could not load this chart.</div>`;
   }
+}
+
+// Pinch / wheel / drag zoom for the scatter. Only the plot interior zooms: the
+// dots ride a transformed group clipped to the plot rect, while the axes, grid
+// and tick labels stay put. The window is tracked in plot-local space [0,PW] x
+// [0,PH] so it can never pan into the margins. On every change we re-place the
+// dots (kept a constant screen size so close points actually separate), re-label
+// the fixed-position ticks for the visible window, and flag `zoomed` for the
+// frame highlight + level badge. Max zoom-out is the default (full) view; zoom in
+// to 6x. Records _lastPanEnd so the click that ends a gesture does not select a
+// dot, and touch-action flips to 'none' only while zoomed so the page still
+// scrolls at the default view.
+function _attachZoom(svg) {
+  const pan = svg.querySelector('.ch-pan');
+  if (!pan) return;
+  const FW = 440, FH = 280, MAX = 6;
+  const L = +pan.dataset.l, R = +pan.dataset.r, T = +pan.dataset.t, B = +pan.dataset.b;
+  const PW = FW - L - R, PH = FH - T - B;
+  const xlo = +pan.dataset.xlo, xhi = +pan.dataset.xhi, ylo = +pan.dataset.ylo, yhi = +pan.dataset.yhi;
+  const xsuf = pan.dataset.xsuf || '', ysuf = pan.dataset.ysuf || '';
+  const xticks = svg.querySelectorAll('.ch-xtick'), yticks = svg.querySelectorAll('.ch-ytick');
+  const dots = pan.querySelectorAll('.ch-dot');
+  const badgeTxt = svg.querySelector('.ch-zoom-badge-txt');
+
+  let vbx = 0, vby = 0, vbw = PW, vbh = PH;   // visible window in plot-local space
+  const apply = () => {
+    const s = PW / vbw;
+    pan.setAttribute('transform', `translate(${(L - s * (L + vbx)).toFixed(2)} ${(T - s * (T + vby)).toFixed(2)}) scale(${s.toFixed(4)})`);
+    const r = (6 / s).toFixed(2);   // counter-scale so dots stay a constant screen size
+    dots.forEach(d => d.setAttribute('r', r));
+    for (let i = 0; i <= 4; i++) {
+      const dx = xlo + (vbx + i / 4 * vbw) / PW * (xhi - xlo);
+      if (xticks[i]) xticks[i].textContent = Math.round(dx) + xsuf;
+      const py = vby + (1 - i / 4) * vbh;
+      const dy = ylo + (PH - py) / PH * (yhi - ylo);
+      if (yticks[i]) yticks[i].textContent = Math.round(dy) + ysuf;
+    }
+    const zoomed = vbw < PW - 0.5;
+    svg.classList.toggle('zoomed', zoomed);
+    if (badgeTxt) badgeTxt.textContent = s.toFixed(1).replace(/\.0$/, '') + '×';
+    svg.style.touchAction = zoomed ? 'none' : 'pan-y';
+  };
+  const clamp = () => {
+    vbw = Math.min(PW, Math.max(PW / MAX, vbw));
+    vbh = vbw * PH / PW;
+    vbx = Math.min(PW - vbw, Math.max(0, vbx));
+    vby = Math.min(PH - vbh, Math.max(0, vby));
+  };
+  const toLocal = (cx, cy) => {
+    const r = svg.getBoundingClientRect();
+    return {
+      x: vbx + ((cx - r.left) / r.width * FW - L) / PW * vbw,
+      y: vby + ((cy - r.top) / r.height * FH - T) / PH * vbh,
+    };
+  };
+  const zoomAt = (fx, fy, f) => {
+    const nw = Math.min(PW, Math.max(PW / MAX, vbw / f)), ratio = nw / vbw;
+    vbx = fx - (fx - vbx) * ratio;
+    vby = fy - (fy - vby) * ratio;
+    vbw = nw;
+    clamp(); apply();
+  };
+  const reset = () => { vbx = 0; vby = 0; vbw = PW; vbh = PH; apply(); };
+
+  svg.addEventListener('wheel', e => {
+    e.preventDefault();
+    const p = toLocal(e.clientX, e.clientY);
+    zoomAt(p.x, p.y, e.deltaY < 0 ? 1.2 : 1 / 1.2);
+  }, { passive: false });
+  svg.addEventListener('dblclick', e => { e.preventDefault(); reset(); });
+  const badge = svg.querySelector('.ch-zoom-badge');
+  if (badge) badge.addEventListener('click', e => { e.stopPropagation(); reset(); });
+
+  const ptrs = new Map();
+  let lastDist = 0, moved = false;
+  svg.addEventListener('pointerdown', e => {
+    if (ptrs.size === 0) moved = false;
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ptrs.size === 2) {
+      const [a, b] = [...ptrs.values()];
+      lastDist = Math.hypot(a.x - b.x, a.y - b.y);
+    }
+  });
+  svg.addEventListener('pointermove', e => {
+    if (!ptrs.has(e.pointerId)) return;
+    const prev = ptrs.get(e.pointerId), cur = { x: e.clientX, y: e.clientY };
+    ptrs.set(e.pointerId, cur);
+    if (ptrs.size === 2) {
+      const [a, b] = [...ptrs.values()];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      if (lastDist > 0) {
+        const m = toLocal((a.x + b.x) / 2, (a.y + b.y) / 2);
+        zoomAt(m.x, m.y, dist / lastDist);
+      }
+      lastDist = dist; moved = true;
+    } else if (ptrs.size === 1 && vbw < PW - 0.5) {
+      const r = svg.getBoundingClientRect();
+      vbx -= (cur.x - prev.x) / r.width * FW / PW * vbw;
+      vby -= (cur.y - prev.y) / r.height * FH / PH * vbh;
+      clamp(); apply();
+      moved = true;
+    }
+  });
+  const end = e => {
+    ptrs.delete(e.pointerId);
+    if (ptrs.size < 2) lastDist = 0;
+    if (ptrs.size === 0 && moved) _lastPanEnd = Date.now();
+  };
+  svg.addEventListener('pointerup', end);
+  svg.addEventListener('pointercancel', end);
+
+  apply();   // initial transform, dot size and tick labels
 }
 
 // ── INIT ───────────────────────────────────────────────────────────────────────
@@ -344,6 +463,7 @@ async function init() {
   // deselects too.
   document.addEventListener('click', e => {
     if (e.target.closest('.chart-caption-link')) return;   // let the caption link navigate
+    if (Date.now() - _lastPanEnd < 250) return;            // ignore the click that ends a pan/pinch
     const hit = e.target.closest('.ch-hit');
     document.querySelectorAll('#chartStage .ch-hit.sel').forEach(d => d.classList.remove('sel'));
     const cap = document.getElementById('chartCaption');

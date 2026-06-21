@@ -680,9 +680,9 @@ main {
 
 /* SVG chart primitives (charts.js) */
 .chart-svg { width: 100%; height: auto; display: block; }
+.ch-zoomable { touch-action: pan-y; }   /* zoomable scatter; JS toggles to 'none' while zoomed in */
 .chart-svg text { font-family: inherit; pointer-events: none; }
 .ch-lbl { font-size: 11px; fill: var(--text); }
-.ch-val { font-size: 11px; fill: var(--muted); }
 .ch-ax  { font-size: 9.5px; fill: var(--muted); }
 .ch-axlbl { font-size: 10px; fill: var(--muted); }
 .ch-grid { stroke: var(--border); stroke-width: 1; }
@@ -691,6 +691,15 @@ main {
 .ch-empty { font-size: 12px; fill: var(--muted); }
 .ch-hit { cursor: pointer; }
 .ch-hit.sel { stroke: var(--text); stroke-width: 2; }
+/* Scatter dots sit in a scaled group; keep their selection ring a constant width. */
+.ch-dot { vector-effect: non-scaling-stroke; }
+/* Scatter zoom: the plot frame brightens and a level badge appears while zoomed. */
+.ch-plot-frame { fill: none; stroke: var(--border); stroke-width: 1; }
+.ch-zoomable.zoomed .ch-plot-frame { stroke: var(--accent); stroke-width: 1.5; }
+.ch-zoom-badge { opacity: 0; transition: opacity 0.15s ease; pointer-events: none; }
+.ch-zoomable.zoomed .ch-zoom-badge { opacity: 1; pointer-events: auto; cursor: pointer; }
+.ch-zoom-badge-bg { fill: var(--accent); }
+.ch-zoom-badge-txt { font-size: 10px; font-weight: 700; fill: #fff; }
 
 @media (hover: hover) {
   .chart-select:hover { border-color: var(--s4); }
@@ -2691,8 +2700,7 @@ select:disabled {
   .box-picker { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
   /* Charts scale down on phones, so bump the in-SVG text up to stay legible. */
   .ch-ax, .ch-axlbl, .ch-cellval { font-size: 12.5px; }
-  .ch-lbl, .ch-val               { font-size: 13.5px; }
-  .ch-dot                        { r: 7px; }   /* bigger scatter dots, tappable once the SVG shrinks */
+  .ch-lbl                        { font-size: 13.5px; }
   /* Descriptions wrap to more lines on narrow screens; reserve more so the card
      keeps a consistent height across charts. */
   .chart-card-desc { min-height: 7.3em; }

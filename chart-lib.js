@@ -7,8 +7,8 @@
 const Charts = (() => {
   const W = 440, H = 280;   // logical viewBox; CSS scales it to fit the card
 
-  function wrap(inner, { w = W, h = H } = {}) {
-    return `<svg class="chart-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img">${inner}</svg>`;
+  function wrap(inner, { w = W, h = H, cls = '' } = {}) {
+    return `<svg class="chart-svg${cls ? ' ' + cls : ''}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img">${inner}</svg>`;
   }
   function empty() {
     return wrap(`<text x="${W / 2}" y="${H / 2}" class="ch-empty" text-anchor="middle" dominant-baseline="middle">No data</text>`);
@@ -29,23 +29,47 @@ const Charts = (() => {
   // a pace band.
   const PALETTE = ['#a5b4fc', '#818cf8', '#6366f1', '#4f46e5', '#4338ca', '#3730a3', '#312e81', '#1e1b4b'];
 
-  // Horizontal bars: data = [{ label, value, color?, ... }]. fmt(value, datum).
-  function barsH(data, { fmt = v => v, labelW = 96, valW = 88, color = 'var(--accent)' } = {}) {
+  // "Nice" axis ticks: a round step (1 / 2 / 2.5 / 5 x 10^n) so labels land on
+  // tidy values (0 500 1000 1500 2000 rather than 0 463 925 ...). Returns the
+  // padded axis max plus every tick value from 0 up to it.
+  function niceTicks(dmax, count = 4) {
+    if (!(dmax > 0)) return { max: 1, ticks: [0, 1] };
+    const rough = dmax / count;
+    const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+    const norm = rough / mag;
+    const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * mag;
+    const max = Math.ceil(dmax / step) * step;
+    const ticks = [];
+    for (let v = 0; v <= max + step * 1e-6; v += step) ticks.push(+v.toFixed(6));
+    return { max, ticks };
+  }
+
+  // Horizontal bars: data = [{ label, value, color?, meta? }]. The x-axis uses
+  // nice tick values (axisFmt labels them); a bar's exact value lives in the tap
+  // caption (meta), not at the bar end.
+  function barsH(data, { axisFmt = v => v, labelW = 96, color = 'var(--accent)' } = {}) {
     if (!data.length) return empty();
-    const max = Math.max(...data.map(d => d.value)) || 1;
-    const top = 12, rowH = Math.min(36, (H - top - 12) / data.length), bw = W - labelW - valW;
-    // Bars cap at W - valW, and the value text sits just after each bar, so the
-    // number stays attached to its bar and still always has room to fit.
+    const dmax = Math.max(...data.map(d => d.value)) || 1;
+    const { max, ticks } = niceTicks(dmax, 4);
+    const top = 10, B = 24, RM = 12;   // RM: right margin so the last tick label is not clipped
+    const rowH = Math.min(36, (H - top - B) / data.length), bw = W - labelW - RM;
+    const botY = top + data.length * rowH;   // baseline = bottom of the last bar
+    // x-axis: a gridline + label at each nice tick, drawn behind the bars.
+    let axis = '';
+    for (const v of ticks) {
+      const x = labelW + (v / max) * bw;
+      const anchor = v === 0 ? 'start' : v === max ? 'end' : 'middle';
+      axis += `<line x1="${x.toFixed(1)}" y1="${top}" x2="${x.toFixed(1)}" y2="${botY.toFixed(1)}" class="ch-grid"/><text x="${x.toFixed(1)}" y="${(botY + 13).toFixed(1)}" class="ch-ax" text-anchor="${anchor}">${_esc(axisFmt(v))}</text>`;
+    }
     const rows = data.map((d, i) => {
       const y = top + i * rowH, len = Math.max(2, (d.value / max) * bw);
       const name = d.name != null ? d.name : d.label;
-      const meta = d.meta != null ? d.meta : String(fmt(d.value, d));
+      const meta = d.meta != null ? d.meta : String(d.value);
       return `
         <text x="${labelW - 8}" y="${y + rowH / 2}" class="ch-lbl" text-anchor="end" dominant-baseline="middle">${_esc(d.label)}</text>
-        <rect${hit(name, meta, d.href)} x="${labelW}" y="${y + 5}" width="${len.toFixed(1)}" height="${rowH - 14}" rx="3" fill="${d.color || color}"><title>${titleText(name, meta)}</title></rect>
-        <text x="${(labelW + len + 6).toFixed(1)}" y="${y + rowH / 2}" class="ch-val" dominant-baseline="middle">${_esc(fmt(d.value, d))}</text>`;
+        <rect${hit(name, meta, d.href)} x="${labelW}" y="${y + 5}" width="${len.toFixed(1)}" height="${rowH - 14}" rx="3" fill="${d.color || color}"><title>${titleText(name, meta)}</title></rect>`;
     }).join('');
-    return wrap(rows);
+    return wrap(axis + rows);
   }
 
   // Vertical bars: data = [{ value, ... }]. xTick(i) optional axis label every xEvery.
@@ -70,10 +94,11 @@ const Charts = (() => {
     return wrap(grid + bars);
   }
 
-  // Scatter: points = [{ x, y, label, color? }].
-  function scatter(points, { xLabel = '', xFmt = v => v, yFmt = v => v, yMax = null } = {}) {
+  // Scatter: points = [{ x, y, label, color? }]. xSuffix/ySuffix label the axis
+  // ticks (e.g. '%'); the zoom code re-labels those same ticks as you zoom.
+  function scatter(points, { xLabel = '', xSuffix = '', ySuffix = '', yMax = null } = {}) {
     if (!points.length) return empty();
-    const L = 42, R = 14, T = 14, B = 40;
+    const L = 42, R = 14, T = 14, B = 40, PW = W - L - R, PH = H - T - B;
     const xs = points.map(p => p.x), ys = points.map(p => p.y);
     // Fit the axes to the data range (with a little padding) rather than forcing
     // a zero origin, so the cloud fills the plot instead of hugging a corner.
@@ -83,28 +108,43 @@ const Charts = (() => {
     const xpad = (x1 - x0) * 0.08 || 1, ypad = (y1 - y0) * 0.08 || 1;
     const xlo = Math.max(0, x0 - xpad), xhi = x1 + xpad;
     const ylo = Math.max(0, y0 - ypad), yhi = yMax != null ? Math.min(yMax, y1 + ypad) : y1 + ypad;
-    const sx = x => L + (x - xlo) / (xhi - xlo) * (W - L - R);
-    const sy = y => (H - B) - (y - ylo) / (yhi - ylo) * (H - T - B);
+    const sx = x => L + (x - xlo) / (xhi - xlo) * PW;
+    const sy = y => (H - B) - (y - ylo) / (yhi - ylo) * PH;
     let grid = '';
-    // y gridlines + labels (left)
+    // y gridlines stay put; their labels (ch-ytick) are rewritten by the zoom.
     for (let i = 0; i <= 4; i++) {
       const v = ylo + (yhi - ylo) * i / 4, yy = sy(v);
-      grid += `<line x1="${L}" y1="${yy.toFixed(1)}" x2="${W - R}" y2="${yy.toFixed(1)}" class="ch-grid"/><text x="${L - 6}" y="${yy.toFixed(1)}" class="ch-ax" text-anchor="end" dominant-baseline="middle">${_esc(yFmt(Math.round(v)))}</text>`;
+      grid += `<line x1="${L}" y1="${yy.toFixed(1)}" x2="${W - R}" y2="${yy.toFixed(1)}" class="ch-grid"/><text x="${L - 6}" y="${yy.toFixed(1)}" class="ch-ax ch-ytick" text-anchor="end" dominant-baseline="middle">${_esc(Math.round(v) + ySuffix)}</text>`;
     }
-    // x gridlines + ticks (bottom)
+    // x gridlines + ticks (ch-xtick), likewise re-labelled on zoom.
     for (let i = 0; i <= 4; i++) {
       const v = xlo + (xhi - xlo) * i / 4, xx = sx(v);
       const anchor = i === 0 ? 'start' : i === 4 ? 'end' : 'middle';
-      grid += `<line x1="${xx.toFixed(1)}" y1="${T}" x2="${xx.toFixed(1)}" y2="${(H - B).toFixed(1)}" class="ch-grid"/><text x="${xx.toFixed(1)}" y="${H - B + 14}" class="ch-ax" text-anchor="${anchor}">${_esc(xFmt(Math.round(v)))}</text>`;
+      grid += `<line x1="${xx.toFixed(1)}" y1="${T}" x2="${xx.toFixed(1)}" y2="${(H - B).toFixed(1)}" class="ch-grid"/><text x="${xx.toFixed(1)}" y="${H - B + 14}" class="ch-ax ch-xtick" text-anchor="${anchor}">${_esc(Math.round(v) + xSuffix)}</text>`;
     }
     // Dots carry the name + meta (+ optional href) so the page can show a
     // clickable caption on tap (the <title> hover tooltip does not fire on touch).
     const dots = points.map(p => {
       const boxAttr = p.box ? ` data-box="${_esc(p.box)}" data-boxhref="${_esc(p.boxHref || '')}"` : '';
-      return `<circle${hit(p.label, p.meta, p.href, 'ch-dot')}${boxAttr} cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="5" fill="${p.color || 'var(--accent)'}" fill-opacity="0.85"><title>${titleText(p.label, p.meta)}</title></circle>`;
+      return `<circle${hit(p.label, p.meta, p.href, 'ch-dot')}${boxAttr} cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="6" fill="${p.color || 'var(--accent)'}" fill-opacity="0.85"><title>${titleText(p.label, p.meta)}</title></circle>`;
     }).join('');
+    // The dots ride in a group that the zoom transforms, wrapped in a fixed clip
+    // (the plot rect) so the zoom never spills over the axes. The plot ranges and
+    // tick suffixes ride on the group so the zoom code can re-place dots and
+    // re-label the (fixed-position) ticks for the visible window.
+    const plot =
+      `<clipPath id="scClip"><rect x="${L}" y="${T}" width="${PW}" height="${PH}"/></clipPath>` +
+      `<g clip-path="url(#scClip)"><g class="ch-pan"` +
+      ` data-l="${L}" data-r="${R}" data-t="${T}" data-b="${B}"` +
+      ` data-xlo="${xlo}" data-xhi="${xhi}" data-ylo="${ylo}" data-yhi="${yhi}"` +
+      ` data-xsuf="${_esc(xSuffix)}" data-ysuf="${_esc(ySuffix)}">${dots}</g></g>`;
+    const frame = `<rect class="ch-plot-frame" x="${L}" y="${T}" width="${PW}" height="${PH}" fill="none"/>`;
+    const badge =
+      `<g class="ch-zoom-badge" transform="translate(${W - R - 4} ${T + 4})">` +
+      `<rect class="ch-zoom-badge-bg" x="-44" y="0" width="44" height="17" rx="4"/>` +
+      `<text class="ch-zoom-badge-txt" x="-22" y="12" text-anchor="middle">1×</text></g>`;
     const axis = xLabel ? `<text x="${((L + W - R) / 2).toFixed(1)}" y="${H - 6}" class="ch-axlbl" text-anchor="middle">${_esc(xLabel)}</text>` : '';
-    return wrap(grid + dots + axis);
+    return wrap(grid + plot + frame + badge + axis, { cls: 'ch-zoomable' });
   }
 
   // Histogram from raw values; bins evenly across [min, max], then drawn as barsV.
@@ -163,7 +203,14 @@ const Charts = (() => {
     segments = segments.filter(s => s.value > 0);
     if (!segments.length) return empty();
     const total = segments.reduce((a, s) => a + s.value, 0);
-    const cx = 132, cy = H / 2, r = 96, rin = 58;
+    const r = 114, rin = 68, cy = H / 2;
+    // Centre the donut + legend as one block (the legend width is estimated from
+    // the longest label) rather than pinning the donut to the left.
+    const maxLabel = Math.max(...segments.map(s => String(s.label).length));
+    const legendW = 19 + maxLabel * 6.5, gap = 26;   // swatch + gap + ~text width
+    const startX = Math.max(0, (W - (2 * r + gap + legendW)) / 2);
+    const cx = startX + r;
+    const lx = startX + 2 * r + gap;
     const p = (rad, ang) => `${(cx + rad * Math.cos(ang)).toFixed(2)} ${(cy + rad * Math.sin(ang)).toFixed(2)}`;
     let a0 = -Math.PI / 2, arcs = '';
     segments.forEach((s, i) => {
@@ -174,10 +221,10 @@ const Charts = (() => {
       arcs += `<path${hit(s.label, meta, s.href)} d="M${p(r, a0)} A${r} ${r} 0 ${big} 1 ${p(r, a1)} L${p(rin, a1)} A${rin} ${rin} 0 ${big} 0 ${p(rin, a0)} Z" fill="${col}" stroke="var(--s1)" stroke-width="2"><title>${titleText(s.label, meta)}</title></path>`;
       a0 = a1;
     });
-    const lx = 264, ly = cy - segments.length * 12;
+    const ly = cy - segments.length * 12;
     const legend = segments.map((s, i) => {
       const col = s.color || PALETTE[i % PALETTE.length], y = ly + i * 26;
-      return `<rect x="${lx}" y="${y}" width="13" height="13" rx="2" fill="${col}"/><text x="${lx + 19}" y="${y + 11}" class="ch-lbl">${_esc(s.label)} (${Math.round(s.value / total * 100)}%)</text>`;
+      return `<rect x="${lx}" y="${y}" width="13" height="13" rx="2" fill="${col}"/><text x="${lx + 19}" y="${y + 11}" class="ch-lbl">${_esc(s.label)}</text>`;
     }).join('');
     return wrap(arcs + legend);
   }
