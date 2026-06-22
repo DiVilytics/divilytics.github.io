@@ -126,7 +126,7 @@ const Charts = (() => {
     // clickable caption on tap (the <title> hover tooltip does not fire on touch).
     const dots = points.map(p => {
       const boxAttr = p.box ? ` data-box="${_esc(p.box)}" data-boxhref="${_esc(p.boxHref || '')}"` : '';
-      return `<circle${hit(p.label, p.meta, p.href, 'ch-dot')}${boxAttr} cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="6" fill="${p.color || 'var(--accent)'}" fill-opacity="0.85"><title>${titleText(p.label, p.meta)}</title></circle>`;
+      return `<circle${hit(p.label, p.meta, p.href, 'ch-dot')}${boxAttr} cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="8" fill="${p.color || 'var(--accent)'}" fill-opacity="0.85"><title>${titleText(p.label, p.meta)}</title></circle>`;
     }).join('');
     // The dots ride in a group that the zoom transforms, wrapped in a fixed clip
     // (the plot rect) so the zoom never spills over the axes. The plot ranges and

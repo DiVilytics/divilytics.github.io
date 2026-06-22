@@ -91,7 +91,7 @@ const CHARTS = [
         const games = rows.reduce((a, c) => a + c.games, 0);
         const wins  = rows.reduce((a, c) => a + c.wins,  0);
         const pct   = games ? Math.round(wins / games * 100) : 0;
-        return { label: b[0].toUpperCase() + b.slice(1), value: pct, games, color: `var(--pace-${b})`, meta: `${pct}% win rate | ${games} games | ${rows.length} villains` };
+        return { label: b[0].toUpperCase() + b.slice(1), value: pct, games, color: `var(--pace-${b})`, href: `characters.html?pace=${b}`, meta: `${pct}% win rate | ${games} games | ${rows.length} villains` };
       }).filter(d => d.games > 0);
       return Charts.barsH(data, { axisFmt: v => `${v}%`, labelW: 60 });
     },
@@ -230,7 +230,7 @@ const CHARTS = [
       const vals = await _playerStats();
       if (!vals.length) return Charts.barsV([]);
       const max = Math.max(...vals);
-      const SIZE = 4;   // fixed 4-game bands (1-4, 5-8, ...)
+      const SIZE = 5;   // fixed 5-game bands (1-5, 6-10, ...)
       const n = Math.floor((max - 1) / SIZE) + 1;
       const buckets = Array.from({ length: n }, (_, b) => ({ lo: b * SIZE + 1, hi: (b + 1) * SIZE, value: 0 }));
       for (const p of vals) buckets[Math.min(n - 1, Math.floor((p - 1) / SIZE))].value++;
@@ -353,7 +353,7 @@ async function selectChart(id) {
 function _attachZoom(svg) {
   const pan = svg.querySelector('.ch-pan');
   if (!pan) return;
-  const FW = 440, FH = 280, MAX = 6;
+  const FW = 440, FH = 280, MAX = 10;
   const L = +pan.dataset.l, R = +pan.dataset.r, T = +pan.dataset.t, B = +pan.dataset.b;
   const PW = FW - L - R, PH = FH - T - B;
   const xlo = +pan.dataset.xlo, xhi = +pan.dataset.xhi, ylo = +pan.dataset.ylo, yhi = +pan.dataset.yhi;
@@ -366,7 +366,7 @@ function _attachZoom(svg) {
   const apply = () => {
     const s = PW / vbw;
     pan.setAttribute('transform', `translate(${(L - s * (L + vbx)).toFixed(2)} ${(T - s * (T + vby)).toFixed(2)}) scale(${s.toFixed(4)})`);
-    const r = (6 / s).toFixed(2);   // counter-scale so dots stay a constant screen size
+    const r = (8 / s).toFixed(2);   // counter-scale so dots stay a constant screen size
     dots.forEach(d => d.setAttribute('r', r));
     for (let i = 0; i <= 4; i++) {
       const dx = xlo + (vbx + i / 4 * vbw) / PW * (xhi - xlo);
@@ -405,7 +405,7 @@ function _attachZoom(svg) {
   svg.addEventListener('wheel', e => {
     e.preventDefault();
     const p = toLocal(e.clientX, e.clientY);
-    zoomAt(p.x, p.y, e.deltaY < 0 ? 1.2 : 1 / 1.2);
+    zoomAt(p.x, p.y, e.deltaY < 0 ? 1.05 : 1 / 1.05);
   }, { passive: false });
   svg.addEventListener('dblclick', e => { e.preventDefault(); reset(); });
   const badge = svg.querySelector('.ch-zoom-badge');
@@ -430,7 +430,7 @@ function _attachZoom(svg) {
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
       if (lastDist > 0) {
         const m = toLocal((a.x + b.x) / 2, (a.y + b.y) / 2);
-        zoomAt(m.x, m.y, dist / lastDist);
+        zoomAt(m.x, m.y, Math.pow(dist / lastDist, 0.5));   // damped so the pinch is less twitchy
       }
       lastDist = dist; moved = true;
     } else if (ptrs.size === 1 && vbw < PW - 0.5) {
@@ -462,26 +462,39 @@ async function init() {
   // tap anywhere else to clear it. Document-level so a tap outside the chart
   // deselects too.
   document.addEventListener('click', e => {
-    if (e.target.closest('.chart-caption-link')) return;   // let the caption link navigate
+    if (e.target.closest('.chart-caption-link')) return;   // let a caption link navigate
     if (Date.now() - _lastPanEnd < 250) return;            // ignore the click that ends a pan/pinch
-    const hit = e.target.closest('.ch-hit');
-    document.querySelectorAll('#chartStage .ch-hit.sel').forEach(d => d.classList.remove('sel'));
     const cap = document.getElementById('chartCaption');
-    if (!hit) { if (cap) cap.textContent = ''; return; }   // tapped outside any element
+    const hit = e.target.closest('.ch-hit');
+    const wasSel = hit && hit.classList.contains('sel');
+    document.querySelectorAll('#chartStage .ch-hit.sel').forEach(d => d.classList.remove('sel'));
+    if (cap) cap.replaceChildren();                        // always start from a fully cleared caption
+    if (!hit || wasSel) return;                            // tapped empty space, or tapped to deselect
     hit.classList.add('sel');
     // Donut slices overlap at their borders, so raise the selected slice to the
     // front for a clean outline. Only paths (donut arcs) need this; raising a
     // heatmap cell <rect> would cover its own % label drawn just after it.
     if (hit.tagName.toLowerCase() === 'path' && hit.parentNode) hit.parentNode.appendChild(hit);
     if (!cap) return;
-    const name = hit.getAttribute('data-name') || '';
-    const meta = hit.getAttribute('data-meta') || '';
-    const link = (text, h) => h ? `<a class="chart-caption-link" href="${_esc(h)}">${_esc(text)}</a>` : _esc(text);
-    const parts = [link(name, hit.getAttribute('data-href'))];
-    const box = hit.getAttribute('data-box');
-    if (box) parts.push(link(box, hit.getAttribute('data-boxhref')));   // secondary link, e.g. the scatter's box
-    if (meta) parts.push(_esc(meta));
-    cap.innerHTML = parts.join(' | ');
+    // Build the caption from DOM nodes (no innerHTML string), skipping any empty
+    // part so a missing name can never leave a dangling " | meta" behind.
+    const part = (text, href) => {
+      if (!text) return null;
+      if (!href) return document.createTextNode(text);
+      const a = document.createElement('a');
+      a.className = 'chart-caption-link';
+      a.href = href;
+      a.textContent = text;
+      return a;
+    };
+    const nodes = [
+      part(hit.getAttribute('data-name'), hit.getAttribute('data-href')),
+      part(hit.getAttribute('data-box'), hit.getAttribute('data-boxhref')),   // scatter's secondary box link
+      part(hit.getAttribute('data-meta'), null),
+    ].filter(Boolean);
+    const frag = document.createDocumentFragment();
+    nodes.forEach((n, i) => { if (i) frag.append(' | '); frag.append(n); });
+    cap.replaceChildren(frag);
   });
   selectChart(CHARTS[0].id);
 }

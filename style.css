@@ -301,6 +301,8 @@ a.chip {
   vertical-align: 1px;
   flex-shrink: 0;
 }
+a.pace-dot { cursor: pointer; transition: transform 0.12s; }
+a.pace-dot:hover { transform: scale(1.3); }
 .pace-dot.green  { background: var(--pace-green); }
 .pace-dot.yellow { background: var(--pace-yellow); }
 .pace-dot.orange { background: var(--pace-orange); }
@@ -2181,6 +2183,9 @@ select:disabled {
 @media (hover: hover) {
   .cs-mini-row:hover { background: var(--s2); }
 }
+
+.cs-roster-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 1.25rem; }
+.cs-roster-controls-lbl { font-size: 12px; font-weight: 600; color: var(--muted); }
 
 .char-roster-group { margin-bottom: 1.5rem; scroll-margin-top: 70px; }
 

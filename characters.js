@@ -246,9 +246,22 @@ async function init() {
 
   const params   = new URLSearchParams(location.search);
   const charName = (params.get('char') || '').trim();
-  if (!charName) await renderRosterPage((params.get('box') || '').trim());
-  else           await renderDetailPage(charName);
+  if (charName) { await renderDetailPage(charName); return; }
+
+  // ?pace= opens the roster straight into pace view, scrolled to that band
+  // (mirrors how ?box= scrolls to a box group).
+  const pace = (params.get('pace') || '').trim().toLowerCase();
+  if (['green', 'yellow', 'orange', 'red'].includes(pace)) {
+    csRosterView = 'pace';
+    await renderRosterPage(`pace-${pace}`);
+  } else {
+    await renderRosterPage((params.get('box') || '').trim());
+  }
 }
+
+// Roster grouping mode: 'box' (the curated default) or 'pace' (by the four
+// objective paces). The seg in the controls row flips between them.
+let csRosterView = 'box';
 
 async function renderRosterPage(scrollBox) {
   document.title = 'DiVilytics | Characters';
@@ -257,22 +270,15 @@ async function renderRosterPage(scrollBox) {
   setVisible('csSearchWrap', true);
   _attachCharSearch();
 
-  const byBox = groupByBox(csAllChars);
   const root = document.getElementById('csRoot');
   root.className = '';
   root.innerHTML =
-    `<div id="csSummary"></div>` +
-    Object.entries(byBox).map(([box, chars]) => `
-      <div class="char-roster-group" id="${boxAnchorId(box)}">
-        <div class="char-roster-group-name">${_esc(box)}</div>
-        <div class="char-roster">${
-          chars.map(c => `
-            <a class="char-roster-item" href="characters.html?char=${encodeURIComponent(c.name)}">
-              <img class="char-roster-portrait" src="${charImgSrc(c.name)}" alt="" onerror="this.src='asset/players/default.svg'">
-              <div class="char-roster-name">${_esc(c.name)}</div>
-            </a>`).join('')
-        }</div>
-      </div>`).join('');
+    `<div id="csSummary"></div>
+     <div class="cs-roster-controls">
+       <span class="cs-roster-controls-lbl">Group by</span>
+       ${_rosterViewSegHTML()}
+     </div>
+     <div id="csGroups">${_rosterGroupsHTML(csAllChars)}</div>`;
 
   // Wait for the monthly report (it fills #csSummary above the groups and
   // changes layout) before scrolling, so a ?box= jump lands at the right spot.
@@ -280,6 +286,59 @@ async function renderRosterPage(scrollBox) {
   if (scrollBox) {
     requestAnimationFrame(() => document.getElementById(scrollBox)?.scrollIntoView({ block: 'start' }));
   }
+}
+
+function _rosterViewSegHTML() {
+  const btn = (v, label) => `<button class="seg-btn ${csRosterView === v ? 'on' : ''}" type="button" data-view="${v}" onclick="csSetRosterView('${v}')">${label}</button>`;
+  return `<div class="seg cs-roster-seg">${btn('box', 'Box')}${btn('pace', 'Pace')}</div>`;
+}
+
+// Flip the grouping without reloading: re-render only the groups + seg state.
+function csSetRosterView(v) {
+  if (v === csRosterView) return;
+  csRosterView = v;
+  const groups = document.getElementById('csGroups');
+  if (groups) groups.innerHTML = _rosterGroupsHTML(csAllChars);
+  document.querySelectorAll('.cs-roster-seg .seg-btn')
+    .forEach(b => b.classList.toggle('on', b.dataset.view === v));
+}
+
+function _rosterGroupsHTML(chars) {
+  const groups = csRosterView === 'pace' ? _rosterPaceGroups(chars) : _rosterBoxGroups(chars);
+  return groups.map(g => `
+    <div class="char-roster-group" id="${g.id}">
+      <div class="char-roster-group-name">${g.header}</div>
+      <div class="char-roster">${g.chars.map(_rosterItemHTML).join('')}</div>
+    </div>`).join('');
+}
+
+function _rosterBoxGroups(chars) {
+  return Object.entries(groupByBox(chars)).map(([box, cs]) => ({
+    id: boxAnchorId(box), header: _esc(box), chars: cs,
+  }));
+}
+
+// Group by the four paces (in pace order); any character without a recognised
+// pace falls into a trailing "Other" group rather than vanishing.
+function _rosterPaceGroups(chars) {
+  const paces = [['green', 'Green'], ['yellow', 'Yellow'], ['orange', 'Orange'], ['red', 'Red']];
+  const groups = paces.map(([pace, name]) => ({
+    id: `pace-${pace}`,
+    header: `<span class="pace-dot ${pace}"></span>${name}`,
+    chars: chars.filter(c => c.pace === pace),
+  })).filter(g => g.chars.length);
+  const known = new Set(paces.map(p => p[0]));
+  const rest = chars.filter(c => !known.has(c.pace));
+  if (rest.length) groups.push({ id: 'pace-other', header: 'Other', chars: rest });
+  return groups;
+}
+
+function _rosterItemHTML(c) {
+  return `
+    <a class="char-roster-item" href="characters.html?char=${encodeURIComponent(c.name)}">
+      <img class="char-roster-portrait" src="${charImgSrc(c.name)}" alt="" onerror="this.src='asset/players/default.svg'">
+      <div class="char-roster-name">${_esc(c.name)}</div>
+    </a>`;
 }
 
 function _showCsEmpty(html) {
@@ -342,7 +401,7 @@ async function renderDetailPage(charName) {
 async function _renderCharIdentity() {
   const objectives = await loadObjectives();
   const objective  = objectives[csChar.name];
-  const paceDot    = csChar.pace ? `<span class="pace-dot ${csChar.pace}" title="${_esc(csChar.pace)}"></span>` : '';
+  const paceDot    = csChar.pace ? `<a class="pace-dot ${csChar.pace}" href="characters.html?pace=${csChar.pace}" title="View ${_esc(csChar.pace)}-pace characters"></a>` : '';
   document.getElementById('csIdentity').innerHTML =
     `<div class="pf-identity"><img class="char-portrait identity-portrait zoomable" src="${charImgSrc(csChar.name)}" alt="" onerror="this.src='asset/players/default.svg'" onclick="showAvatarLightbox(this.src, 'asset/players/default.svg')"><span class="pf-name-block"><span class="pf-nick">${_esc(csChar.name)}</span>${csChar.box ? `<a class="pf-since pf-since-link" href="characters.html?box=${boxAnchorId(csChar.box)}" title="View ${_esc(csChar.box)} characters">${_esc(csChar.box)}</a>` : ''}</span></div>${objective ? `<p class="char-objective">${paceDot}${_esc(objective)}</p>` : ''}`;
 }
