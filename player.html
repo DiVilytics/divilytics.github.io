@@ -2,122 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-  <title>DiVilytics | Players</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-  <link rel="icon" type="image/png" href="/asset/favicon/favicon-96x96.png?v=20260603b" sizes="96x96" />
-  <link rel="icon" type="image/svg+xml" href="/asset/favicon/favicon.svg?v=20260603b" />
-  <link rel="shortcut icon" href="/asset/favicon/favicon.ico?v=20260603b" />
-  <link rel="apple-touch-icon" sizes="180x180" href="/asset/favicon/apple-touch-icon.png?v=20260603b" />
-  <meta name="apple-mobile-web-app-title" content="DiVilytics" />
-  <meta name="theme-color" content="#000000" />
-  <link rel="manifest" href="/asset/favicon/site.webmanifest?v=20260603b" />
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-6MTR91YL11"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-6MTR91YL11');
-  </script>
+  <title>DiVilytics</title>
+  <!-- player.html was renamed to players.html. This stub forwards old links
+       (e.g. profile QR codes shared before the rename), preserving ?nick= and
+       any hash. Safe to delete once no old player.html links remain in the wild. -->
+  <script>location.replace('players.html' + location.search + location.hash);</script>
+  <meta http-equiv="refresh" content="0; url=players.html">
 </head>
-<body>
-
-<nav>
-  <a class="nav-brand" href="index.html"><img src="asset/logos/logo-b.svg" alt="DiVilytics | Disney Villainous Analytics"></a>
-  <div class="nav-right">
-    <div class="nav-links">
-      <a href="new-game.html" title="New Game">🎲</a>
-      <a href="game-log.html" title="Game Log">🕒</a>
-      <a href="leaderboard.html" title="Leaderboard">🏆</a>
-      <a href="characters.html" title="Characters">🎭</a>
-      <a href="player.html" id="navProfile" title="Player">👤</a>
-      <a href="charts.html" title="Charts">📊</a>
-    </div>
-    <div class="nav-auth" id="navAuth"></div>
-  </div>
-</nav>
-
-<main>
-  <div class="page-header align-top">
-    <div>
-      <h2>Players</h2>
-    </div>
-    <div class="cs-search">
-      <input type="text" id="pfJumpInput" placeholder="Search player…" maxlength="30" autocomplete="off">
-      <div class="cs-dropdown" id="pfDropdown"></div>
-    </div>
-  </div>
-
-  <div id="pfIdentity"></div>
-
-  <div class="controls hidden" id="pfControls">
-    <div class="pill-group" id="pfFilterPills">
-      <button class="pill on" onclick="pfSetFilter('all')" type="button">All</button>
-      <button class="pill"    onclick="pfSetFilter(2)"     type="button">2p</button>
-      <button class="pill"    onclick="pfSetFilter(3)"     type="button">3p</button>
-      <button class="pill"    onclick="pfSetFilter(4)"     type="button">4p</button>
-      <button class="pill"    onclick="pfSetFilter(5)"     type="button">5p</button>
-      <button class="pill"    onclick="pfSetFilter(6)"     type="button">6p</button>
-    </div>
-  </div>
-
-  <div id="pfRoot" class="spinner">Loading…</div>
-</main>
-
-<!-- Achievement detail sheet -->
-<div class="overlay" id="achOverlay" onclick="if(event.target===this) _closeAchOverlay()">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-header">
-      <h3 id="achTitle">Achievement</h3>
-      <button class="sheet-close" onclick="_closeAchOverlay()">×</button>
-    </div>
-    <div class="sheet-body" id="achBody"></div>
-  </div>
-</div>
-
-
-<!-- Share profile QR sheet -->
-<div class="overlay" id="pfQrOverlay">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-header">
-      <h3 id="pfQrTitle">Share profile</h3>
-      <button class="sheet-close" onclick="closeProfileQR()">×</button>
-    </div>
-    <div class="sheet-body">
-      <p class="modal-hint">Others can scan this to view this player profile.</p>
-      <div class="qr-wrap">
-        <div id="pfQrCode"></div>
-      </div>
-      <div class="qr-url-row">
-        <div class="qr-url" id="qrUrlText"></div>
-        <button class="pf-btn" onclick="copyQrUrl()" title="Copy link">⎘</button>
-      </div>
-    </div>
-    <div class="sheet-footer">
-      <button class="btn btn-primary" onclick="closeProfileQR()">Done</button>
-    </div>
-  </div>
-</div>
-
-<!-- The delete-game confirmation sheet is injected on demand by openConfirmSheet (ui.js). -->
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script src="config.js"></script>
-<script src="db.js"></script>
-  <script src="theme.js"></script>
-  <script src="ui.js"></script>
-  <script src="avatar.js"></script>
-  <script src="achievements.js"></script>
-  <script src="stats-table.js"></script>
-  <script src="search.js"></script>
-  <script src="game-card.js"></script>
-  <script src="shared.js"></script>
-<script src="player.js"></script>
-</body>
+<body></body>
 </html>

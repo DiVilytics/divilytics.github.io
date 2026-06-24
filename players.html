@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-  <title>DiVilytics | Characters</title>
+  <title>DiVilytics | Players</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
@@ -43,21 +43,71 @@
 <main>
   <div class="page-header align-top">
     <div>
-      <h2>Characters</h2>
+      <h2>Players</h2>
     </div>
-    <div class="cs-search hidden" id="csSearchWrap">
-      <input type="text" id="csSearchInput" placeholder="Jump to character…" autocomplete="off">
-      <div class="cs-dropdown" id="csDropdown"></div>
+    <div class="cs-search">
+      <input type="text" id="pfJumpInput" placeholder="Search player…" maxlength="30" autocomplete="off">
+      <div class="cs-dropdown" id="pfDropdown"></div>
     </div>
   </div>
 
-  <div id="csIdentity"></div>
+  <div id="pfIdentity"></div>
 
-  <div id="csRoot" class="spinner">Loading…</div>
-  <div id="csFaq"></div>
+  <div class="controls hidden" id="pfControls">
+    <div class="pill-group" id="pfFilterPills">
+      <button class="pill on" onclick="pfSetFilter('all')" type="button">All</button>
+      <button class="pill"    onclick="pfSetFilter(2)"     type="button">2p</button>
+      <button class="pill"    onclick="pfSetFilter(3)"     type="button">3p</button>
+      <button class="pill"    onclick="pfSetFilter(4)"     type="button">4p</button>
+      <button class="pill"    onclick="pfSetFilter(5)"     type="button">5p</button>
+      <button class="pill"    onclick="pfSetFilter(6)"     type="button">6p</button>
+    </div>
+  </div>
+
+  <div id="pfRoot" class="spinner">Loading…</div>
 </main>
 
+<!-- Achievement detail sheet -->
+<div class="overlay" id="achOverlay" onclick="if(event.target===this) _closeAchOverlay()">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <h3 id="achTitle">Achievement</h3>
+      <button class="sheet-close" onclick="_closeAchOverlay()">×</button>
+    </div>
+    <div class="sheet-body" id="achBody"></div>
+  </div>
+</div>
+
+
+<!-- Share profile QR sheet -->
+<div class="overlay" id="pfQrOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <h3 id="pfQrTitle">Share profile</h3>
+      <button class="sheet-close" onclick="closeProfileQR()">×</button>
+    </div>
+    <div class="sheet-body">
+      <p class="modal-hint">Others can scan this to view this player profile.</p>
+      <div class="qr-wrap">
+        <div id="pfQrCode"></div>
+      </div>
+      <div class="qr-url-row">
+        <div class="qr-url" id="qrUrlText"></div>
+        <button class="pf-btn" onclick="copyQrUrl()" title="Copy link">⎘</button>
+      </div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn btn-primary" onclick="closeProfileQR()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- The delete-game confirmation sheet is injected on demand by openConfirmSheet (ui.js). -->
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="config.js"></script>
 <script src="db.js"></script>
   <script src="theme.js"></script>
@@ -68,6 +118,6 @@
   <script src="search.js"></script>
   <script src="game-card.js"></script>
   <script src="shared.js"></script>
-<script src="characters.js"></script>
+<script src="players.js"></script>
 </body>
 </html>

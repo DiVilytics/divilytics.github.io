@@ -138,7 +138,7 @@ function render({ rows, summary }) {
       getKey:      r   => isChar ? r.character : r.nickname,
       getHref:     key => isChar
         ? `characters.html?char=${encodeURIComponent(key)}`
-        : `player.html?nick=${encodeURIComponent(key)}`,
+        : `players.html?nick=${encodeURIComponent(key)}`,
       getIdentity: key => isChar ? charImgHTML(key) : playerAvatarHTML(lbNickAvatarMap[key]),
       getSub:      key => isChar ? lbCharBoxMap[key] : '',
       getSubHref:  key => (isChar && lbCharBoxMap[key]) ? `characters.html?box=${boxAnchorId(lbCharBoxMap[key])}` : '',

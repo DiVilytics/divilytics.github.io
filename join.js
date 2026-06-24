@@ -131,7 +131,7 @@ function claimGoBack() {
   // Return to wherever we came from (e.g. the player profile); fall back to the
   // profile page when the claim page was opened cold (e.g. via a shared QR).
   if (history.length > 1) { history.back(); return; }
-  location.href = 'player.html';
+  location.href = 'players.html';
 }
 
 function shareGame() {

@@ -80,7 +80,7 @@ function _renderPage() {
         <span id="acctAvatarPreviewWrap"></span>
         <div class="acct-identity-info">
           <div class="acct-nick">${_acctNick
-            ? `<a class="acct-nick-link" href="player.html?nick=${encodeURIComponent(_acctNick)}" title="View my player page">${_esc(_acctNick)}</a>`
+            ? `<a class="acct-nick-link" href="players.html?nick=${encodeURIComponent(_acctNick)}" title="View my player page">${_esc(_acctNick)}</a>`
             : '-'}</div>
           ${metaLn ? `<div class="pf-since">${_esc(metaLn)}</div>` : ''}
           <button class="btn btn-ghost btn-sm acct-change-nick" onclick="changeNickname()">Change nickname</button>

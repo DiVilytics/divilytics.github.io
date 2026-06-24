@@ -366,7 +366,11 @@ function _attachZoom(svg) {
   const apply = () => {
     const s = PW / vbw;
     pan.setAttribute('transform', `translate(${(L - s * (L + vbx)).toFixed(2)} ${(T - s * (T + vby)).toFixed(2)}) scale(${s.toFixed(4)})`);
-    const r = (8 / s).toFixed(2);   // counter-scale so dots stay a constant screen size
+    // Dots grow with zoom: 8px on screen at the default view up to 2x (16px) at
+    // max zoom. r is in pre-transform units, so divide the target screen size by
+    // the group scale s. (The selection ring stays constant via non-scaling-stroke.)
+    const grow = 1 + (s - 1) / (MAX - 1);   // 1 at default, 2 at MAX
+    const r = (8 * grow / s).toFixed(2);
     dots.forEach(d => d.setAttribute('r', r));
     for (let i = 0; i <= 4; i++) {
       const dx = xlo + (vbx + i / 4 * vbw) / PW * (xhi - xlo);
@@ -468,7 +472,7 @@ async function init() {
     const hit = e.target.closest('.ch-hit');
     const wasSel = hit && hit.classList.contains('sel');
     document.querySelectorAll('#chartStage .ch-hit.sel').forEach(d => d.classList.remove('sel'));
-    if (cap) cap.replaceChildren();                        // always start from a fully cleared caption
+    if (cap) cap.textContent = '';                         // wipe the whole caption (links + text) every time
     if (!hit || wasSel) return;                            // tapped empty space, or tapped to deselect
     hit.classList.add('sel');
     // Donut slices overlap at their borders, so raise the selected slice to the
@@ -492,9 +496,7 @@ async function init() {
       part(hit.getAttribute('data-box'), hit.getAttribute('data-boxhref')),   // scatter's secondary box link
       part(hit.getAttribute('data-meta'), null),
     ].filter(Boolean);
-    const frag = document.createDocumentFragment();
-    nodes.forEach((n, i) => { if (i) frag.append(' | '); frag.append(n); });
-    cap.replaceChildren(frag);
+    nodes.forEach((n, i) => { if (i) cap.append(' | '); cap.append(n); });
   });
   selectChart(CHARTS[0].id);
 }

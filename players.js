@@ -21,7 +21,7 @@ let pfDisplayLimit   = PAGE_SIZE;
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
 async function init() {
-  setActiveNav('player.html');
+  setActiveNav('players.html');
   await initAuth();
   _attachPlayerSearch();
 
@@ -33,7 +33,7 @@ async function init() {
     const loggedProfile = getCurrentProfile();
     if (loggedUser && loggedProfile?.nickname) {
       pfNick = loggedProfile.nickname;
-      history.replaceState(null, '', `player.html?nick=${encodeURIComponent(pfNick)}`);
+      history.replaceState(null, '', `players.html?nick=${encodeURIComponent(pfNick)}`);
     } else if (loggedUser && !loggedProfile) {
       document.title = 'DiVilytics | Player';
       document.getElementById('pfRoot').className = '';
@@ -42,7 +42,7 @@ async function init() {
           <div class="empty-icon">👤</div>
           <h3>Welcome!</h3>
           <p>Choose a nickname before you can record games.</p>
-          <button class="btn btn-primary btn-sm" onclick="_openNicknameModal(newNick => { location.href = 'player.html?nick=' + encodeURIComponent(newNick); })">Set Nickname</button>
+          <button class="btn btn-primary btn-sm" onclick="_openNicknameModal(newNick => { location.href = 'players.html?nick=' + encodeURIComponent(newNick); })">Set Nickname</button>
         </div>`;
       return;
     } else {
@@ -161,7 +161,7 @@ async function _loadFriends() {
 function _friendsSectionHTML() {
   if (!pfFriends.length) return '';
   const rows = pfFriends.map((f, i) => `
-    <a class="pf-friend" href="player.html?nick=${encodeURIComponent(f.nick)}">
+    <a class="pf-friend" href="players.html?nick=${encodeURIComponent(f.nick)}">
       <span class="pf-friend-rank">${i + 1}</span>
       ${playerAvatarHTML(f.avatar)}
       <span class="pf-friend-nick">${_esc(f.nick)}</span>
@@ -197,12 +197,12 @@ function pfJump(ev) {
   ev.preventDefault();
   const v = document.getElementById('pfJumpInput').value.trim();
   if (!v) return false;
-  location.href = `player.html?nick=${encodeURIComponent(v)}`;
+  location.href = `players.html?nick=${encodeURIComponent(v)}`;
   return false;
 }
 
 function _attachPlayerSearch() {
-  const goTo = nick => { location.href = `player.html?nick=${encodeURIComponent(nick)}`; };
+  const goTo = nick => { location.href = `players.html?nick=${encodeURIComponent(nick)}`; };
   attachSearchBox({
     inputId:    'pfJumpInput',
     dropdownId: 'pfDropdown',
@@ -438,7 +438,7 @@ function showProfileQR() {
   if (!pfNick) return;
   const title = document.getElementById('pfQrTitle');
   if (title) title.textContent = `Share ${pfNick}`;
-  showQRModal(new URL(`player.html?nick=${encodeURIComponent(pfNick)}`, location.href).href, 'pfQrCode', 'pfQrOverlay');
+  showQRModal(new URL(`players.html?nick=${encodeURIComponent(pfNick)}`, location.href).href, 'pfQrCode', 'pfQrOverlay');
 }
 
 function closeProfileQR() {
