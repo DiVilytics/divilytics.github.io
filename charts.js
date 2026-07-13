@@ -475,7 +475,16 @@ async function init() {
     const hit = justPanned ? null : e.target.closest('.ch-hit');
     const wasSel = hit && hit.classList.contains('sel');
     document.querySelectorAll('#chartStage .ch-hit.sel').forEach(d => d.classList.remove('sel'));
-    if (cap) cap.textContent = '';                         // wipe the whole caption (links + text) every time
+    if (cap) {
+      cap.textContent = '';                                // wipe the whole caption (links + text) every time
+      // WebKit/Safari can leave the old text visually painted here even though
+      // the DOM is genuinely empty (confirmed: cleared node has no children,
+      // yet stale text remains on screen until something else forces a
+      // repaint, e.g. opening devtools). Toggling display forces one.
+      cap.style.display = 'none';
+      void cap.offsetHeight;
+      cap.style.display = '';
+    }
     if (!hit || wasSel) return;                            // tapped empty space, or tapped to deselect
     if (!hit.getAttribute('data-name')) return;             // no name to show; leave the caption cleared rather than a dangling "| box | meta"
     hit.classList.add('sel');
