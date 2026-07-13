@@ -70,7 +70,7 @@ const CHARTS = [
           x: c.games,
           y: pct,
           label: c.name,
-          color: c.pace ? `var(--pace-${c.pace})` : 'var(--accent)',
+          color: c.pace ? `var(--pace-${c.pace})` : 'var(--pace-gray)',
           href: `characters.html?char=${encodeURIComponent(c.name)}`,
           box: c.box || null,
           boxHref: c.box ? `characters.html?box=${boxAnchorId(c.box)}` : null,
@@ -85,9 +85,9 @@ const CHARTS = [
     desc: "Each pace band's overall win rate, pooling every villain of that colour (total wins over total games). Tap a band for its games and villains.",
     async render() {
       const cs = await _characterStats();
-      const bands = ['green', 'yellow', 'orange', 'red'];
+      const bands = ['green', 'yellow', 'orange', 'red', 'gray'];
       const data = bands.map(b => {
-        const rows  = cs.filter(c => c.pace === b);
+        const rows  = b === 'gray' ? cs.filter(c => !c.pace) : cs.filter(c => c.pace === b);
         const games = rows.reduce((a, c) => a + c.games, 0);
         const wins  = rows.reduce((a, c) => a + c.wins,  0);
         const pct   = games ? Math.round(wins / games * 100) : 0;
@@ -467,13 +467,17 @@ async function init() {
   // deselects too.
   document.addEventListener('click', e => {
     if (e.target.closest('.chart-caption-link')) return;   // let a caption link navigate
-    if (Date.now() - _lastPanEnd < 250) return;            // ignore the click that ends a pan/pinch
     const cap = document.getElementById('chartCaption');
-    const hit = e.target.closest('.ch-hit');
+    // The click that ends a pan/pinch should still clear any existing selection
+    // (it landed inside the chart, same as any other non-dot tap); it should
+    // only be stopped from being read as "tap a dot" and selecting a new one.
+    const justPanned = Date.now() - _lastPanEnd < 250;
+    const hit = justPanned ? null : e.target.closest('.ch-hit');
     const wasSel = hit && hit.classList.contains('sel');
     document.querySelectorAll('#chartStage .ch-hit.sel').forEach(d => d.classList.remove('sel'));
     if (cap) cap.textContent = '';                         // wipe the whole caption (links + text) every time
     if (!hit || wasSel) return;                            // tapped empty space, or tapped to deselect
+    if (!hit.getAttribute('data-name')) return;             // no name to show; leave the caption cleared rather than a dangling "| box | meta"
     hit.classList.add('sel');
     // Donut slices overlap at their borders, so raise the selected slice to the
     // front for a clean outline. Only paths (donut arcs) need this; raising a

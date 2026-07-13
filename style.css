@@ -54,6 +54,7 @@
   --pace-yellow: #facc15;
   --pace-orange: #fb923c;
   --pace-red:    #e05454;
+  --pace-gray:   #9ca3af;
 }
 
 [data-theme="light"] {
@@ -307,6 +308,7 @@ a.pace-dot:hover { transform: scale(1.3); }
 .pace-dot.yellow { background: var(--pace-yellow); }
 .pace-dot.orange { background: var(--pace-orange); }
 .pace-dot.red    { background: var(--pace-red); }
+.pace-dot.gray   { background: var(--pace-gray); }
 
 /* ── LIVE GAME PANEL ──────────────────────────────────────────────── */
 .live-status {
@@ -1189,9 +1191,14 @@ select:disabled {
 /* The character identity is two lines (name + box) and inherits body line-height
    1.5, making it taller than the min-height can absorb. Tighten it so the block
    fits and min-height governs both tabs to the same height. Applied on the
-   leaderboard (#lb) and the player page's character board (#pfRoot) alike. */
-#lb .row-name, #pfRoot .row-name { line-height: 1.3; }
-#lb .row-sub,  #pfRoot .row-sub  { line-height: 1.2; margin-top: 0; }
+   leaderboard (#lb) and the player page's character board (#pfRoot) alike.
+   The tightened line-height clips descenders (g/y/p/q/j) against the
+   overflow:hidden box needed for the ellipsis truncation, so pad the box
+   past the line-box and cancel the padding with an equal negative margin,
+   this keeps the two-line block's total footprint (and thus min-height)
+   unchanged while giving descenders physical room inside the clip box. */
+#lb .row-name, #pfRoot .row-name { line-height: 1.3; padding-bottom: 3px; margin-bottom: -3px; }
+#lb .row-sub,  #pfRoot .row-sub  { line-height: 1.2; margin-top: 0; padding-bottom: 2px; margin-bottom: -2px; }
 
 /* The viewer's own row, highlighted wherever it appears (top list or pinned). */
 .lb-row-self {

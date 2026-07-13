@@ -251,7 +251,7 @@ async function init() {
   // ?pace= opens the roster straight into pace view, scrolled to that band
   // (mirrors how ?box= scrolls to a box group).
   const pace = (params.get('pace') || '').trim().toLowerCase();
-  if (['green', 'yellow', 'orange', 'red'].includes(pace)) {
+  if (['green', 'yellow', 'orange', 'red', 'gray'].includes(pace)) {
     csRosterView = 'pace';
     await renderRosterPage(`pace-${pace}`);
   } else {
@@ -319,7 +319,7 @@ function _rosterBoxGroups(chars) {
 }
 
 // Group by the four paces (in pace order); any character without a recognised
-// pace falls into a trailing "Other" group rather than vanishing.
+// pace falls into a trailing "Gray" group rather than vanishing.
 function _rosterPaceGroups(chars) {
   const paces = [['green', 'Green'], ['yellow', 'Yellow'], ['orange', 'Orange'], ['red', 'Red']];
   const groups = paces.map(([pace, name]) => ({
@@ -329,7 +329,7 @@ function _rosterPaceGroups(chars) {
   })).filter(g => g.chars.length);
   const known = new Set(paces.map(p => p[0]));
   const rest = chars.filter(c => !known.has(c.pace));
-  if (rest.length) groups.push({ id: 'pace-other', header: 'Other', chars: rest });
+  if (rest.length) groups.push({ id: 'pace-gray', header: `<span class="pace-dot gray"></span>Gray`, chars: rest });
   return groups;
 }
 
@@ -401,7 +401,9 @@ async function renderDetailPage(charName) {
 async function _renderCharIdentity() {
   const objectives = await loadObjectives();
   const objective  = objectives[csChar.name];
-  const paceDot    = csChar.pace ? `<a class="pace-dot ${csChar.pace}" href="characters.html?pace=${csChar.pace}" title="View ${_esc(csChar.pace)}-pace characters"></a>` : '';
+  const paceDot    = csChar.pace
+    ? `<a class="pace-dot ${csChar.pace}" href="characters.html?pace=${csChar.pace}" title="View ${_esc(csChar.pace)}-pace characters"></a>`
+    : `<a class="pace-dot gray" href="characters.html?pace=gray" title="Pace not yet set"></a>`;
   document.getElementById('csIdentity').innerHTML =
     `<div class="pf-identity"><img class="char-portrait identity-portrait zoomable" src="${charImgSrc(csChar.name)}" alt="" onerror="this.src='asset/players/default.svg'" onclick="showAvatarLightbox(this.src, 'asset/players/default.svg')"><span class="pf-name-block"><span class="pf-nick">${_esc(csChar.name)}</span>${csChar.box ? `<a class="pf-since pf-since-link" href="characters.html?box=${boxAnchorId(csChar.box)}" title="View ${_esc(csChar.box)} characters">${_esc(csChar.box)}</a>` : ''}</span></div>${objective ? `<p class="char-objective">${paceDot}${_esc(objective)}</p>` : ''}`;
 }
