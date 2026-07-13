@@ -26,12 +26,14 @@ coverage/
 .parcel-cache/
 
 # Editor and IDE files
+.claude/
 .vscode/
 !.vscode/extensions.json
 !.vscode/settings.json
 .idea/
 *.swp
 *.swo
+
 
 # Local overrides
 *.local
