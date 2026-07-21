@@ -7,7 +7,7 @@ let lbTab    = 'characters';   // 'characters' | 'players'
 let lbMode   = 'pct';          // 'pct' | 'count' | 'games'
 let lbFilter = 'all';          // 'all' | 2 | 3 | 4 | 5 | 6
 
-const LB_PAGE_SIZE = 100;
+const LB_PAGE_SIZE = 30;
 let lbDisplayLimit = LB_PAGE_SIZE;
 
 // Cache: key `${lbTab}:${lbFilter}` → { rows, summary }
