@@ -314,7 +314,7 @@ function _rosterGroupsHTML(chars) {
 }
 
 function _rosterBoxGroups(chars) {
-  return Object.entries(groupByBox(chars, csBoxInfo)).map(([box, cs]) => ({
+  return Object.entries(groupByBox(chars, csBoxInfo, true)).map(([box, cs]) => ({
     id: boxAnchorId(box), header: _esc(box), chars: cs,
   }));
 }

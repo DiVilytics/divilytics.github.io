@@ -20,11 +20,25 @@ function charImgHTML(name) {
 // ordered by its `order` field (matching the box-completion achievement tiles
 // in achievements.js/account.js); when omitted, groups fall back to whatever
 // order `chars` arrived in (i.e. `sort_order`), same as before this existed.
-function groupByBox(chars, boxInfo) {
+//
+// `includeExtra`, when true, also lists a character under each of its
+// `extraBoxes` (loadCharacters() decorates every character with this from
+// character-extra-boxes.json: a reprint into another box with identical
+// rules, not a [TAG] rework). Defaults to false so existing callers (the
+// draw-pool grid, the new-game character picker, achievements' box
+// completion) keep counting a character toward its one primary box only;
+// opt in per-caller where showing every box a character appears in makes
+// sense (the characters.html roster).
+function groupByBox(chars, boxInfo, includeExtra = false) {
   const map = {};
   for (const c of chars) {
     if (!map[c.box]) map[c.box] = [];
     map[c.box].push(c);
+    if (!includeExtra) continue;
+    for (const box of c.extraBoxes || []) {
+      if (!map[box]) map[box] = [];
+      map[box].push(c);
+    }
   }
   if (!boxInfo) return map;
   const sorted = {};
@@ -52,20 +66,35 @@ function charSelectHTML(chars, selected = '', boxInfo) {
 // represents membership in `set` ("on" for filter selection, "excluded" for
 // the new-game character filter). The `onToggle(name, nowActive)` callback
 // fires after the set + DOM are updated.
-function buildCharPillGrid(container, chars, set, { activeClass = 'on', onToggle, boxInfo } = {}) {
-  const byBox = groupByBox(chars, boxInfo);
+//
+// `includeExtra` (see groupByBox) lists a reprinted character under every box
+// it appears in, one pill per box. Those pills toggle INDEPENDENTLY, not in
+// sync: turning the character off in one box (or via that box's header)
+// shouldn't pull it out of a box you're still including it from (e.g. owning
+// both "Wicked to the Core" and "Darkness Brewing" should let you drop
+// Darkness Brewing from today's pool without also losing Evil Queen, since
+// she's still available via the other box). `set` only gains the name once
+// every one of its pills is off, and loses it again the moment any single
+// copy is switched back on.
+function buildCharPillGrid(container, chars, set, { activeClass = 'on', onToggle, boxInfo, includeExtra = false } = {}) {
+  const byBox = groupByBox(chars, boxInfo, includeExtra);
   container.innerHTML = '';
 
   // The pill's own class is the source of truth for "is this active": some
   // callers (new-game) reassign their backing set on every recompute, so a
   // captured set reference can go stale, the DOM class never does. We still
   // mutate `set` and fire `onToggle` so the caller's real state stays in sync.
+  const pillsByName = new Map();   // name -> every pill button rendered for it (1, or more if reprinted)
   const isActive = btn => btn.classList.contains(activeClass);
-  const setChar = (name, btn, active) => {
-    if (active === isActive(btn)) return;
+  const applyPill = (btn, active) => {
     btn.classList.toggle(activeClass, active);
-    if (active) set.add(name); else set.delete(name);
-    onToggle?.(name, active);
+    const name  = btn.dataset.name;
+    const pills = pillsByName.get(name);
+    const allOn = pills.every(isActive);
+    const wasIn = set.has(name);
+    if (allOn === wasIn) return;
+    if (allOn) set.add(name); else set.delete(name);
+    onToggle?.(name, allOn);
   };
 
   for (const [box, cs] of Object.entries(byBox)) {
@@ -82,23 +111,26 @@ function buildCharPillGrid(container, chars, set, { activeClass = 'on', onToggle
       btn.className = 'char-pill' + (set.has(c.name) ? ` ${activeClass}` : '');
       btn.innerHTML = charImgHTML(c.name) + _esc(c.name);
       btn.dataset.name = c.name;
-      btn.onclick = () => setChar(c.name, btn, !isActive(btn));
-      boxBtns.push({ name: c.name, btn });
+      btn.onclick = () => applyPill(btn, !isActive(btn));
+      if (!pillsByName.has(c.name)) pillsByName.set(c.name, []);
+      pillsByName.get(c.name).push(btn);
+      boxBtns.push(btn);
       pillsEl.appendChild(btn);
     }
 
-    // Box header toggles every character in this box at once: if all are already
-    // active, clear them; otherwise activate them all. Only touches this box's
-    // characters, so selections elsewhere are preserved.
+    // Box header toggles every character in this box at once: if all are
+    // already active, clear them; otherwise activate them all. Only touches
+    // this box's own pills; a reprinted character's pill in another box
+    // (and the pool membership rule above) decides independently.
     group.querySelector('.box-name').onclick = () => {
-      const allOn = boxBtns.every(({ btn }) => isActive(btn));
-      boxBtns.forEach(({ name, btn }) => setChar(name, btn, !allOn));
+      const allOn = boxBtns.every(isActive);
+      boxBtns.forEach(btn => applyPill(btn, !allOn));
     };
   }
 }
 
 function buildExcludeGrid(container, chars, excludedSet, onChange, boxInfo) {
-  buildCharPillGrid(container, chars, excludedSet, { activeClass: 'excluded', onToggle: onChange, boxInfo });
+  buildCharPillGrid(container, chars, excludedSet, { activeClass: 'excluded', onToggle: onChange, boxInfo, includeExtra: true });
 }
 
 // ── FORMATTING ────────────────────────────────────────────────────────────────

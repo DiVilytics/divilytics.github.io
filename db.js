@@ -137,20 +137,28 @@ async function loadBoxInfo() {
   return _boxInfo;
 }
 
+let _charExtraBoxes = null;
+async function loadCharacterExtraBoxes() {
+  if (!_charExtraBoxes) _charExtraBoxes = await _fetchJson(DATA_CHARACTER_EXTRA_BOXES_URL);
+  return _charExtraBoxes;
+}
+
 // ── CHARACTER CACHE ───────────────────────────────────────────────────────────
 
 let _chars = null;
 
 async function loadCharacters() {
   if (_chars) return _chars;
-  const { data, error } = await db
-    .from('characters')
-    .select('*')
-    .order('sort_order');
+  const [{ data, error }, extraBoxes] = await Promise.all([
+    db.from('characters').select('*').order('sort_order'),
+    loadCharacterExtraBoxes(),
+  ]);
   if (error) {
     console.error('Failed to load characters:', error.message);
     return [];
   }
-  _chars = data || [];
+  // `extraBoxes` decorates every character with the additional boxes it's
+  // reprinted into (character-extra-boxes.json), so callers get it for free.
+  _chars = (data || []).map(c => ({ ...c, extraBoxes: extraBoxes[c.name] || [] }));
   return _chars;
 }
