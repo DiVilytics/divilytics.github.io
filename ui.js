@@ -111,6 +111,7 @@ function buildCharPillGrid(container, chars, set, { activeClass = 'on', onToggle
       btn.className = 'char-pill' + (set.has(c.name) ? ` ${activeClass}` : '');
       btn.innerHTML = charImgHTML(c.name) + _esc(c.name);
       btn.dataset.name = c.name;
+      btn.dataset.box  = box;   // which box THIS pill represents, for per-box ownership checks (pace-filter.js)
       btn.onclick = () => applyPill(btn, !isActive(btn));
       if (!pillsByName.has(c.name)) pillsByName.set(c.name, []);
       pillsByName.get(c.name).push(btn);

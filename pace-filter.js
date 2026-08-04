@@ -83,22 +83,28 @@ function createPaceFilter({
         : mineOn ? mineTitles.on : mineTitles.off;
   }
 
-  // Rebuild the excluded set from the current pace + My-boxes selection:
-  // everything outside the selected band (or, when My boxes is on, outside the
-  // user's boxes) is excluded; everything else is included. A character owned
-  // via a reprint box (c.extraBoxes, character-extra-boxes.json) counts as
-  // owned too, even if the user doesn't have its primary box.
+  // Rebuild the excluded set from the current pace + My-boxes selection.
+  // Pace is a per-character trait (excluded if outside the band, same result
+  // for every pill of that character); My-boxes is evaluated per PILL, via
+  // its own data-box (ui.js), since a reprinted character can have one copy
+  // in a box you own and another in a box you don't. A character only
+  // actually leaves the pool once every one of its pills fails, mirroring how
+  // a manual click in the grid behaves (buildCharPillGrid's applyPill).
   function applyPaceSelection() {
-    const band    = selectedPace ? paceBand(selectedPace) : null;
-    const useMine = mineOn && !!getCurrentUser() && ownedBoxes.size > 0;
+    const band       = selectedPace ? paceBand(selectedPace) : null;
+    const useMine    = mineOn && !!getCurrentUser() && ownedBoxes.size > 0;
+    const paceByName = new Map(getChars().map(c => [c.name, c.pace]));
+    const onNames    = new Set();   // characters left included by at least one pill
+    document.querySelectorAll(`#${gridId} .char-pill`).forEach(btn => {
+      const name = btn.dataset.name;
+      const off  = (band && !band.has(paceByName.get(name))) || (useMine && !ownedBoxes.has(btn.dataset.box));
+      btn.classList.toggle('excluded', off);
+      if (!off) onNames.add(name);
+    });
     excluded.clear();
     for (const c of getChars()) {
-      const owned = ownedBoxes.has(c.box) || (c.extraBoxes || []).some(b => ownedBoxes.has(b));
-      if ((band && !band.has(c.pace)) || (useMine && !owned)) {
-        excluded.add(c.name);
-      }
+      if (!onNames.has(c.name)) excluded.add(c.name);
     }
-    syncExcludePills();
     updatePaceUI();
     onChange();
   }
