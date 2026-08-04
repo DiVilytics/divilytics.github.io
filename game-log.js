@@ -3,6 +3,7 @@
 let glGames        = [];   // loaded glGames (current page)
 let glPlayers      = [];   // game_players for loaded glGames
 let glChars        = [];   // character list from DB
+let glBoxInfo      = {};   // loadBoxInfo(), used to order box groups by release date
 
 let glFilterCount    = 'all';   // 'all' | 2 | 3 | 4 | 5 | 6
 let glFilterLocation = null;
@@ -39,13 +40,14 @@ async function init() {
     pace.updatePaceUI();
     render();
   });
-  glChars = await loadCharacters();
+  [glChars, glBoxInfo] = await Promise.all([loadCharacters(), loadBoxInfo()]);
   await pace.loadOwnedBoxes();
   buildExcludeGrid(
     document.getElementById('charGrid'),
     glChars,
     pace.excluded,
-    () => updateFilterUI()
+    () => updateFilterUI(),
+    glBoxInfo
   );
   await loadLocationOptions();
   await load();

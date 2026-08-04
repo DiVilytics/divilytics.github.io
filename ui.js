@@ -16,17 +16,27 @@ function charImgHTML(name) {
 
 // ── CHARACTER GRIDS ───────────────────────────────────────────────────────────
 
-function groupByBox(chars) {
+// `boxInfo` (loadBoxInfo(), db.js) is optional: when given, box groups are
+// ordered by its `order` field (matching the box-completion achievement tiles
+// in achievements.js/account.js); when omitted, groups fall back to whatever
+// order `chars` arrived in (i.e. `sort_order`), same as before this existed.
+function groupByBox(chars, boxInfo) {
   const map = {};
   for (const c of chars) {
     if (!map[c.box]) map[c.box] = [];
     map[c.box].push(c);
   }
-  return map;
+  if (!boxInfo) return map;
+  const sorted = {};
+  for (const box of Object.keys(map).sort((a, b) =>
+    (boxInfo[a]?.order ?? 999) - (boxInfo[b]?.order ?? 999) || a.localeCompare(b))) {
+    sorted[box] = map[box];
+  }
+  return sorted;
 }
 
-function charSelectHTML(chars, selected = '') {
-  const byBox = groupByBox(chars);
+function charSelectHTML(chars, selected = '', boxInfo) {
+  const byBox = groupByBox(chars, boxInfo);
   let html = '<option value="">Character</option>';
   for (const [box, cs] of Object.entries(byBox)) {
     html += `<optgroup label="${box}">`;
@@ -42,8 +52,8 @@ function charSelectHTML(chars, selected = '') {
 // represents membership in `set` ("on" for filter selection, "excluded" for
 // the new-game character filter). The `onToggle(name, nowActive)` callback
 // fires after the set + DOM are updated.
-function buildCharPillGrid(container, chars, set, { activeClass = 'on', onToggle } = {}) {
-  const byBox = groupByBox(chars);
+function buildCharPillGrid(container, chars, set, { activeClass = 'on', onToggle, boxInfo } = {}) {
+  const byBox = groupByBox(chars, boxInfo);
   container.innerHTML = '';
 
   // The pill's own class is the source of truth for "is this active": some
@@ -87,8 +97,8 @@ function buildCharPillGrid(container, chars, set, { activeClass = 'on', onToggle
   }
 }
 
-function buildExcludeGrid(container, chars, excludedSet, onChange) {
-  buildCharPillGrid(container, chars, excludedSet, { activeClass: 'excluded', onToggle: onChange });
+function buildExcludeGrid(container, chars, excludedSet, onChange, boxInfo) {
+  buildCharPillGrid(container, chars, excludedSet, { activeClass: 'excluded', onToggle: onChange, boxInfo });
 }
 
 // ── FORMATTING ────────────────────────────────────────────────────────────────

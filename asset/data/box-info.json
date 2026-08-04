@@ -5,9 +5,10 @@
   "Perfectly Wretched":     { "order": 4, "year": 2020, "slug": "perfectly_wretched" },
   "Despicable Plots":       { "order": 5, "year": 2021, "slug": "despicable_plots" },
   "Bigger and Badder":      { "order": 6, "year": 2022, "slug": "bigger_and_badder" },
-  "Filled with Fright":     { "order": 7, "year": 2023, "slug": "filled_with_fright" },
-  "Sugar and Spite":        { "order": 8, "year": 2024, "slug": "sugar_and_spite" },
-  "Treacherous Tides":      { "order": 9, "year": 2025, "slug": "treacherous_tides" },
-  "Success at Any Cost":    { "order": 10, "year": 2026, "slug": "success_at_any_cost" },
-  "Come, We Fly!":          { "order": 11, "year": 2026, "slug": "come_we_fly" }
+  "Introduction to Evil":   { "order": 7, "year": 2023, "slug": "introduction_to_evil" },
+  "Filled with Fright":     { "order": 8, "year": 2023, "slug": "filled_with_fright" },
+  "Sugar and Spite":        { "order": 9, "year": 2024, "slug": "sugar_and_spite" },
+  "Treacherous Tides":      { "order": 10, "year": 2025, "slug": "treacherous_tides" },
+  "Success at Any Cost":    { "order": 11, "year": 2026, "slug": "success_at_any_cost" },
+  "Come, We Fly!":          { "order": 12, "year": 2026, "slug": "come_we_fly" }
 }

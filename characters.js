@@ -235,6 +235,7 @@ let csBuckets = null;      // computed stats per player count
 let csAdversaries = [];    // head-to-head rows from the character_adversary_stats RPC
 let csRivalMode   = 'pct';   // rivalries metric (also the ranking key): 'pct' (% dominance) | 'count' (# wins/losses)
 let csAllChars  = [];        // full character list for search
+let csBoxInfo   = {};        // loadBoxInfo(), used to order box groups by release date
 let csAvgDur    = null;      // avg game duration (minutes) across this character's games
 let csAvgTurns  = null;      // avg rounds across this character's games
 
@@ -266,7 +267,7 @@ let csRosterView = 'box';
 async function renderRosterPage(scrollBox) {
   document.title = 'DiVilytics | Characters';
 
-  csAllChars = await loadCharacters();
+  [csAllChars, csBoxInfo] = await Promise.all([loadCharacters(), loadBoxInfo()]);
   setVisible('csSearchWrap', true);
   _attachCharSearch();
 
@@ -313,7 +314,7 @@ function _rosterGroupsHTML(chars) {
 }
 
 function _rosterBoxGroups(chars) {
-  return Object.entries(groupByBox(chars)).map(([box, cs]) => ({
+  return Object.entries(groupByBox(chars, csBoxInfo)).map(([box, cs]) => ({
     id: boxAnchorId(box), header: _esc(box), chars: cs,
   }));
 }

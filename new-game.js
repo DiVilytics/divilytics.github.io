@@ -1,6 +1,7 @@
 // ── STATE ─────────────────────────────────────────────────────────────────────
 
 let chars            = [];
+let boxInfo          = {};          // loadBoxInfo(), used to order box groups by release date
 let orderSlots       = [];          // each: { id, char, isMe, isWinner }
 let orderNextId      = 0;
 let slotTimers       = {};          // slotId → setInterval id (active spin animation)
@@ -66,13 +67,14 @@ async function init() {
   // Baseline the auth id (unless the initial auth event already did) so that
   // first event counts as "no change".
   if (_lastAuthId === undefined) _lastAuthId = getCurrentUser()?.id || null;
-  chars = await loadCharacters();
+  [chars, boxInfo] = await Promise.all([loadCharacters(), loadBoxInfo()]);
   await pace.loadOwnedBoxes();
   buildExcludeGrid(
     document.getElementById('excludeGrid'),
     chars,
     pace.excluded,
-    updateExcludeUI
+    updateExcludeUI,
+    boxInfo
   );
   onBeforeSignIn(_savePendingState);
   const restored = _restorePendingState();
@@ -456,7 +458,7 @@ function renderOrderSlots() {
         </div>
         <div class="order-slot-info">
           <select class="order-slot-select" onchange="updateOrderSlot(${s.id}, this.value)" title="Pick manually">
-            ${charSelectHTML(available, s.char)}
+            ${charSelectHTML(available, s.char, boxInfo)}
           </select>
           <div class="order-slot-name">${nameTxt}</div>
           <span class="order-slot-chevron" aria-hidden="true">▾</span>

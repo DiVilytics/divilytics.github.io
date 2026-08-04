@@ -322,5 +322,43 @@
       "term": "Flying Dutchman",
       "text": "Can be used to perform a covered action."
     }
+  ],
+  "Maleficent [I2E]": [
+    {
+      "term": "Fauna & Dreamless Sleep",
+      "text": "If Fauna is played to a location with two copies of Dreamless Sleep, only one is discarded."
+    },
+    {
+      "term": "Forest of Thorns & Dreamless Sleep",
+      "text": "If both are present and a Hero with 4+ Strength is played, Forest of Thorns is discarded first, then the Hero takes -2 Strength from Dreamless Sleep."
+    }
+  ],
+  "Captain Hook [I2E]": [
+    {
+      "term": "Peter Pan",
+      "text": "If revealed first during a Fate action, both cards must be revealed simultaneously."
+    }
+  ],
+  "Prince John [I2E]": [
+    {
+      "term": "Set a Trap",
+      "text": "Moving an Ally is optional, but the Vanquish action is mandatory."
+    },
+    {
+      "term": "Sir Hiss",
+      "text": "Grants access to a covered action once; cannot be repeated if the Hero is defeated later that turn."
+    },
+    {
+      "term": "Steal from the Rich",
+      "text": "Power returns to Prince John and does not count as \"gained\" for trigger purposes."
+    },
+    {
+      "term": "Lady Marian",
+      "text": "If Robin Hood is present, stolen Power returns to the Cauldron, not Prince John."
+    },
+    {
+      "term": "Golden Arrow",
+      "text": "If the assigned Ally defeats Robin Hood, the player gains 2 Power because Robin Hood is removed before the effect triggers."
+    }
   ]
 }
