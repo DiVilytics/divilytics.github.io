@@ -62,15 +62,27 @@ const CHARTS = [
   {
     id: 'scatter', icon: '🎯', label: 'Win rate vs popularity',
     desc: 'Each villain by games played (x) and win rate (y); the axes zoom to the data. Up-left is strong but rarely picked, down-right is popular but weak. Tap a dot to open it.',
+    extraControls: () => `
+      <div class="cs-roster-controls"><span class="cs-roster-controls-lbl">Color by</span><div class="seg">
+        <button class="seg-btn ${_scatterColorMode === 'pace' ? 'on' : ''}" type="button" onclick="setScatterColorMode('pace')">Pace</button>
+        <button class="seg-btn ${_scatterColorMode === 'box'  ? 'on' : ''}" type="button" onclick="setScatterColorMode('box')">Box</button>
+      </div></div>`,
     async render() {
-      const cs = (await _characterStats()).filter(c => c.games > 0);
-      const points = cs.map(c => {
+      const [cs, boxInfo] = await Promise.all([_characterStats(), loadBoxInfo()]);
+      // Box mode reuses the same indigo ramp as the donut charts (PALETTE),
+      // indexed by the box's release order so a given box always lands on the
+      // same shade across renders/reloads, deliberately not the pace colours
+      // (this is a different grouping and shouldn't be misread as a pace band).
+      const boxColor = box => box ? Charts.PALETTE[(boxInfo[box]?.order ?? 0) % Charts.PALETTE.length] : 'var(--pace-gray)';
+      const points = cs.filter(c => c.games > 0).map(c => {
         const pct = Math.round(c.wins / c.games * 100);
         return {
           x: c.games,
           y: pct,
           label: c.name,
-          color: c.pace ? `var(--pace-${c.pace})` : 'var(--pace-gray)',
+          color: _scatterColorMode === 'box'
+            ? boxColor(c.box)
+            : (c.pace ? `var(--pace-${c.pace})` : 'var(--pace-gray)'),
           href: `characters.html?char=${encodeURIComponent(c.name)}`,
           box: c.box || null,
           boxHref: c.box ? `characters.html?box=${boxAnchorId(c.box)}` : null,
@@ -312,6 +324,13 @@ function _needRpc(name) {
 
 let _selected = null;
 let _lastPanEnd = 0;   // timestamp of the last scatter pan/pinch; suppresses the click that ends it
+let _scatterColorMode = 'pace';   // 'pace' | 'box', the scatter's dot-colour toggle
+
+function setScatterColorMode(mode) {
+  if (mode === _scatterColorMode) return;
+  _scatterColorMode = mode;
+  selectChart('scatter');
+}
 
 function _renderPicker() {
   document.getElementById('chartPicker').innerHTML =
@@ -326,6 +345,8 @@ async function selectChart(id) {
   _selected = id;
   _renderPicker();
   document.getElementById('chartDesc').textContent = c.desc;
+  const extra = document.getElementById('chartExtraControls');
+  if (extra) extra.innerHTML = c.extraControls ? c.extraControls() : '';
   const cap = document.getElementById('chartCaption');
   if (cap) cap.textContent = '';
   const stage = document.getElementById('chartStage');

@@ -208,6 +208,22 @@ async function _toggleBox(box) {
 
 // ── DATA EXPORT ──────────────────────────────────────────────────────────────
 
+// CSV field escaping (RFC 4180): quote and double up internal quotes only
+// when the value contains a comma, quote or newline.
+function _csvField(v) {
+  const s = String(v ?? '');
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+// Sortable "YYYY-MM-DD HH:MM" in local time, deliberately not the locale-
+// formatted `fmtDateTime` (ui.js): a spreadsheet sorts/parses this correctly
+// regardless of the viewer's locale, month names don't.
+function _csvDateTime(iso) {
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 async function exportMyData() {
   const user = getCurrentUser();
   if (!user) return;
@@ -216,36 +232,42 @@ async function exportMyData() {
   btn.textContent = 'Preparing…';
 
   try {
-    const [profile, gpAll] = await Promise.all([
-      fetchProfile({ id: user.id }),
-      _fetchAllRows(() => db.from('game_players').select('*').eq('user_id', user.id)),
-    ]);
+    const gpAll = await _fetchAllRows(() => db.from('game_players').select('*').eq('user_id', user.id));
 
-    // Full record of every game you took part in (date, location, duration,
-    // rounds…), newest first, each with the complete list of players (character,
-    // result, seat), so the export is self-contained, not just game ids.
+    // One row per player per game (not one row per game with player1/2/3…
+    // columns), so every game's variable player count (2-6) fits without
+    // padding, and the file filters/pivots cleanly in a spreadsheet.
     const gameIds = [...new Set(gpAll.rows.map(r => r.game_id))];
     const { games, players } = await fetchGamesWithPlayers(gameIds, { orderByPlayedAtDesc: true });
     const playersByGame = {};
     for (const p of players) (playersByGame[p.game_id] ||= []).push(p);
-    const gamesOut = games.map(g => ({
-      ...g,
-      players: sortGamePlayers(playersByGame[g.id] || []),
-    }));
 
-    const payload = {
-      exported_at: new Date().toISOString(),
-      auth_user:   { id: user.id, email: user.email },
-      profile:     profile || null,
-      games:       gamesOut,
-    };
+    const header = ['Game ID', 'Date', 'Location', 'Duration (min)', 'Rounds', 'Player', 'Character', 'Seat', 'Winner'];
+    const rows = [header];
+    for (const g of games) {
+      const dateStr = _csvDateTime(g.played_at);
+      for (const p of sortGamePlayers(playersByGame[g.id] || [])) {
+        rows.push([
+          g.id,
+          dateStr,
+          g.location || '',
+          g.duration_minutes ?? '',
+          g.num_turns ?? '',
+          p.nickname || '',
+          p.character,
+          p.position + 1,
+          p.is_winner ? 'yes' : 'no',
+        ]);
+      }
+    }
+    const csv = rows.map(r => r.map(_csvField).join(',')).join('\r\n');
 
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const blob = new Blob([csv], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     const stamp = new Date().toISOString().slice(0, 10);
     a.href     = url;
-    a.download = `DiVilytics-${_acctNick || user.id}-${stamp}.json`;
+    a.download = `DiVilytics-${_acctNick || user.id}-${stamp}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();

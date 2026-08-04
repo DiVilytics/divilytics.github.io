@@ -124,9 +124,14 @@ const Charts = (() => {
     }
     // Dots carry the name + meta (+ optional href) so the page can show a
     // clickable caption on tap (the <title> hover tooltip does not fire on touch).
+    // A transparent, wide stroke pads the tappable area well past the visible
+    // fill (the SVG "painted" hit-test area includes the stroke even though
+    // its colour is invisible) without changing how the dot looks; .ch-dot's
+    // non-scaling-stroke keeps that padding a constant screen size at every
+    // zoom level, same as the dot radius itself.
     const dots = points.map(p => {
       const boxAttr = p.box ? ` data-box="${_esc(p.box)}" data-boxhref="${_esc(p.boxHref || '')}"` : '';
-      return `<circle${hit(p.label, p.meta, p.href, 'ch-dot')}${boxAttr} cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="8" fill="${p.color || 'var(--accent)'}" fill-opacity="0.85"><title>${titleText(p.label, p.meta)}</title></circle>`;
+      return `<circle${hit(p.label, p.meta, p.href, 'ch-dot')}${boxAttr} cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="8" fill="${p.color || 'var(--accent)'}" fill-opacity="0.85" stroke="transparent" stroke-width="16"><title>${titleText(p.label, p.meta)}</title></circle>`;
     }).join('');
     // The dots ride in a group that the zoom transforms, wrapped in a fixed clip
     // (the plot rect) so the zoom never spills over the axes. The plot ranges and
@@ -191,9 +196,10 @@ const Charts = (() => {
       const anchor = i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle';
       ticks += `<text x="${sx(i).toFixed(1)}" y="${H - 8}" class="ch-ax" text-anchor="${anchor}">${_esc(p.label)}</text>`;
     });
+    // Same invisible-stroke tap padding as the scatter's dots (see there for why).
     const dots = points.map((p, i) => {
       const meta = p.meta != null ? p.meta : String(fmt(p.value));
-      return `<circle${hit(p.label, meta, p.href)} cx="${sx(i).toFixed(1)}" cy="${sy(p.value).toFixed(1)}" r="4" fill="${color}"><title>${titleText(p.label, meta)}</title></circle>`;
+      return `<circle${hit(p.label, meta, p.href)} cx="${sx(i).toFixed(1)}" cy="${sy(p.value).toFixed(1)}" r="4" fill="${color}" stroke="transparent" stroke-width="16"><title>${titleText(p.label, meta)}</title></circle>`;
     }).join('');
     return wrap(`<path d="${area}" fill="${color}" fill-opacity="0.12"/><path d="${path}" fill="none" stroke="${color}" stroke-width="2"/>${grid}${ticks}${dots}`);
   }

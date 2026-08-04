@@ -7,8 +7,14 @@ let lbTab    = 'characters';   // 'characters' | 'players'
 let lbMode   = 'pct';          // 'pct' | 'count' | 'games'
 let lbFilter = 'all';          // 'all' | 2 | 3 | 4 | 5 | 6
 
-const LB_PAGE_SIZE = 30;
+const LB_PAGE_SIZE = 35;
 let lbDisplayLimit = LB_PAGE_SIZE;
+
+// A character/player with only a couple of games can sit at 100% (or 0%) win
+// rate purely by small-sample noise; hide them from the percentage ranking
+// specifically (raw # Wins / # Games stay unaffected, a low count there isn't
+// misleading the same way). Intentionally not user-configurable.
+const MIN_GAMES_FOR_PCT = 5;
 
 // Cache: key `${lbTab}:${lbFilter}` → { rows, summary }
 // Avoids re-fetching when only the sort lbMode changes.
@@ -123,14 +129,25 @@ function render({ rows, summary }) {
     return;
   }
 
+  // % Wins ranking only: a 1-2 game sample can sit at 100% (or 0%) purely by
+  // noise, so it's excluded from that specific ranking. # Wins / # Games stay
+  // unaffected, a low count there isn't misleading the same way.
+  const rankRows = lbMode === 'pct' ? rows.filter(r => r.games >= MIN_GAMES_FOR_PCT) : rows;
+  if (!rankRows.length) {
+    document.getElementById('lb').innerHTML = `
+      ${statModeSegHTML(lbMode, 'setMode')}
+      <div class="empty-state">Nobody has played at least ${MIN_GAMES_FOR_PCT} games yet.</div>`;
+    return;
+  }
+
   const isChar  = lbTab === 'characters';
   // Only the Players tab has a "you" to highlight.
   const selfKey = isChar ? null : (getCurrentProfile()?.nickname || null);
-  const hasMore = rows.length > lbDisplayLimit;
+  const hasMore = rankRows.length > lbDisplayLimit;
 
   document.getElementById('lb').innerHTML = `
     ${statModeSegHTML(lbMode, 'setMode')}
-    ${renderStatTableHTML(rows, {
+    ${renderStatTableHTML(rankRows, {
       mode:        lbMode,
       headLabel:   isChar ? 'Character' : 'Player',
       limit:       lbDisplayLimit,
