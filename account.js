@@ -164,7 +164,10 @@ function _showAvatarTab(name) {
 function _buildBoxPicker() {
   const picker = document.getElementById('boxPicker');
   if (!picker) return;
-  const boxNames = [...new Set(_acctChars.map(c => c.box).filter(Boolean))];
+  // A box that only reprints characters (no character has it as their primary
+  // `box`, e.g. Darkness Brewing) still needs to be markable as owned, so
+  // extraBoxes count too.
+  const boxNames = [...new Set(_acctChars.flatMap(c => [c.box, ...(c.extraBoxes || [])]).filter(Boolean))];
   boxNames.sort((a, b) => {
     const oa = _acctBoxInfo[a]?.order ?? 999;
     const ob = _acctBoxInfo[b]?.order ?? 999;
